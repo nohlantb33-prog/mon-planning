@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mon Planning</title>
+<meta name="description" content="Calendrier de cours personnel, simple et coloré.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🗓️</text></svg>">
+<script>
+  // Applique le thème sauvegardé avant l'affichage, pour éviter un flash du thème par défaut.
+  try {
+    var savedTheme = localStorage.getItem("monPlanningTheme");
+    if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="onboardingOverlay" class="onboarding-overlay">
+    <div class="onboarding-card">
+      <div class="onboarding-emoji">🗓️</div>
+      <h1>Bienvenue sur Mon Planning</h1>
+      <p>Dis-nous qui tu es pour personnaliser ton espace.</p>
+      <form id="onboardingForm">
+        <label>Prénom
+          <input type="text" id="onboardingPrenom" required placeholder="Ton prénom">
+        </label>
+        <label>Adresse mail
+          <input type="email" id="onboardingEmail" required placeholder="toi@exemple.com">
+        </label>
+        <button type="submit" class="btn-primary">Accéder à mon planning</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="appRoot" class="hidden">
+  <header class="topbar">
+    <div class="brand">🗓️ Mon Planning <span id="userGreeting" class="user-greeting"></span></div>
+    <div class="topbar-actions">
+      <button id="espaceBtn" class="btn-ghost">🙋 Solo</button>
+      <button id="todoBtn" class="btn-ghost">✅ To-do</button>
+      <button id="menuBtn" class="btn-ghost">⚙️ Menu</button>
+      <button id="addCourseBtn" class="btn-primary">+ Ajouter une activité</button>
+    </div>
+  </header>
+
+  <main>
+  <div id="planningNormal">
+    <div class="view-switch">
+      <button id="showDayView" class="view-btn">Jour</button>
+      <button id="showWeekView" class="view-btn active">Semaine</button>
+      <button id="showMonthView" class="view-btn">Mois</button>
+    </div>
+
+    <div id="weekView">
+      <div class="week-nav">
+        <button id="todayWeekBtn" class="btn-ghost btn-today" type="button">Aujourd'hui</button>
+        <button id="prevWeek" class="btn-ghost" aria-label="Semaine précédente">←</button>
+        <div id="weekLabel" class="week-label">Cette semaine</div>
+        <button id="nextWeek" class="btn-ghost" aria-label="Semaine suivante">→</button>
+      </div>
+      <div class="range-control">
+        Afficher de
+        <select id="rangeStart"></select>
+        h à
+        <select id="rangeEnd"></select>
+        h
+      </div>
+      <div id="hintWeek"></div>
+
+      <div class="calendar" id="calendar"></div>
+    </div>
+
+    <div id="dayView" class="hidden">
+      <div class="week-nav">
+        <button id="todayDayBtn" class="btn-ghost btn-today" type="button">Aujourd'hui</button>
+        <button id="prevDay" class="btn-ghost" aria-label="Jour précédent">←</button>
+        <div id="dayLabel" class="week-label">Aujourd'hui</div>
+        <button id="nextDay" class="btn-ghost" aria-label="Jour suivant">→</button>
+      </div>
+
+      <div class="calendar calendar-single" id="dayCalendar"></div>
+    </div>
+
+    <div id="monthView" class="hidden">
+      <div class="week-nav">
+        <button id="todayMonthBtn" class="btn-ghost btn-today" type="button">Mois actuel</button>
+        <button id="prevMonth" class="btn-ghost" aria-label="Mois précédent">←</button>
+        <div id="monthLabel" class="week-label">Ce mois</div>
+        <button id="nextMonth" class="btn-ghost" aria-label="Mois suivant">→</button>
+      </div>
+      <div id="hintMonth"></div>
+
+      <div class="month-grid" id="monthGrid"></div>
+    </div>
+  </div>
+
+  <div id="planningEntreprise" class="hidden">
+    <p class="import-explainer">
+      Clique sur une personne pour la sélectionner, puis clique sur un jour pour le colorer à son
+      nom. Reclique sur le même jour pour l'enlever.
+    </p>
+    <div id="entreprisePersonnesList" class="personnes-list"></div>
+
+    <div class="week-nav">
+      <button id="prevEntrepriseMonth" class="btn-ghost" aria-label="Mois précédent">←</button>
+      <div id="entrepriseMonthLabel" class="week-label">Ce mois</div>
+      <button id="nextEntrepriseMonth" class="btn-ghost" aria-label="Mois suivant">→</button>
+    </div>
+
+    <div class="month-grid" id="entrepriseMonthGrid"></div>
+  </div>
+  </main>
+
+  <div id="espaceModalOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>🗂️ Choisir un espace</h2>
+      <p class="import-explainer">
+        Chaque espace a ses propres activités, complètement séparées des autres.
+      </p>
+      <div id="espaceList" class="theme-list"></div>
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button type="button" id="closeEspaceBtn" class="btn-ghost">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="menuModalOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>⚙️ Menu</h2>
+      <div class="menu-tabs" id="menuTabs"></div>
+
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button type="button" id="closeMenuBtn" class="btn-ghost">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="todoModalOverlay" class="todo-fullscreen hidden">
+    <div class="todo-fullscreen-inner">
+      <aside class="todo-sidebar">
+        <div class="todo-sidebar-header">
+          <h2>✅ To-do</h2>
+          <button type="button" id="closeTodoBtn" class="todo-close-btn" aria-label="Fermer">✕</button>
+        </div>
+        <div id="todoModalEspace" class="todo-sidebar-espace"></div>
+
+        <button type="button" id="addTodoListeBtn" class="todo-new-liste-btn">+ Nouvelle liste</button>
+        <form id="todoListeForm" class="todo-liste-form hidden">
+          <input type="text" id="todoListeNom" placeholder="Nom de la liste (ex : Courses)">
+          <div class="todo-liste-form-actions">
+            <button type="submit" class="btn-primary">Créer</button>
+            <button type="button" id="cancelTodoListeBtn" class="btn-ghost">Annuler</button>
+          </div>
+        </form>
+
+        <div id="todoListesList" class="todo-sidebar-list"></div>
+      </aside>
+
+      <main class="todo-main">
+        <div id="todoNoListe" class="todo-empty hidden">
+          <p>Crée ta première liste pour commencer.</p>
+        </div>
+
+        <div id="todoContent" class="hidden">
+          <div class="view-switch todo-view-switch">
+            <button type="button" id="showTodoActiveView" class="view-btn active">À faire</button>
+            <button type="button" id="showTodoDoneView" class="view-btn">✅ Déjà fait</button>
+          </div>
+
+          <div id="todoActiveView">
+            <form id="todoAddForm" class="todo-add-form">
+              <input type="text" id="todoNouvelleTache" placeholder="Ajouter une tâche...">
+              <button type="submit" class="btn-primary">Ajouter</button>
+            </form>
+            <div id="todoActiveList" class="todo-list"></div>
+          </div>
+
+          <div id="todoDoneView" class="hidden">
+            <div id="todoDoneList" class="todo-list"></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="menuDetailOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 id="menuDetailTitle">Titre</h2>
+
+      <div id="menuTabTheme" class="menu-tab-panel hidden">
+        <div id="themeList" class="theme-list"></div>
+      </div>
+
+      <div id="menuTabTips" class="menu-tab-panel hidden">
+        <div id="tipsList"></div>
+      </div>
+
+      <div id="menuTabImport" class="menu-tab-panel hidden">
+        <p class="import-explainer">
+          Importe un fichier <strong>.ics</strong> (export d'emploi du temps) pour remplir ton planning
+          automatiquement et fiablement — les cours qui reviennent chaque semaine sont recréés en
+          "Hebdomadaire", les événements isolés en "Ponctuel".
+        </p>
+        <p class="import-explainer">
+          Tu peux aussi importer un <strong>PDF</strong> d'emploi du temps : la détection est moins fiable
+          (un PDF n'a pas de structure officielle), donc tu pourras vérifier et corriger avant de valider.
+        </p>
+        <label class="import-checkbox">
+          <input type="checkbox" id="importSingleWeek">
+          Ce PDF ne concerne qu'une seule semaine précise (pas une répétition toute l'année)
+        </label>
+        <div id="importWeekMondayField" class="hidden">
+          <label>Semaine concernée (indique un lundi)
+            <input type="date" id="importWeekMonday">
+          </label>
+        </div>
+        <button type="button" id="importTriggerBtn" class="btn-primary">Choisir un fichier .ics ou .pdf</button>
+        <input type="file" id="importFileInput" accept=".ics,.pdf" class="hidden">
+
+        <p class="import-explainer" style="margin-top:20px;">
+          Pour repartir de zéro (par exemple avant de retester un import) :
+        </p>
+        <button type="button" id="clearAllBtn" class="btn-danger">🗑️ Vider mon planning</button>
+      </div>
+
+      <div id="menuTabSemaines" class="menu-tab-panel hidden">
+        <p class="import-explainer">
+          Pour les cours qui n'ont lieu qu'une semaine sur deux, choisis "Semaine A" ou "Semaine B"
+          dans le formulaire d'une activité "Hebdomadaire". Indique ici une date qui tombe un lundi
+          de semaine A — tout le reste se calcule automatiquement à partir de cette référence.
+        </p>
+        <label>Un lundi de semaine A
+          <input type="date" id="semaineARef">
+        </label>
+      </div>
+
+      <div id="menuTabVacances" class="menu-tab-panel hidden">
+        <p class="import-explainer">
+          Choisis ta zone pour que tes activités "Hebdomadaire" et "Quotidien" ne s'affichent plus
+          pendant les vacances scolaires. Dates 2026-2027 officielles (vérifie sur
+          education.gouv.fr en cas de doute).
+        </p>
+        <label>Zone académique
+          <select id="zoneVacances">
+            <option value="aucune">Aucune (ne pas tenir compte des vacances)</option>
+            <option value="A">Zone A (Lyon, Bordeaux, Besançon, Grenoble...)</option>
+            <option value="B">Zone B (Lille, Nantes, Rennes, Strasbourg...)</option>
+            <option value="C">Zone C (Paris, Créteil, Versailles, Toulouse...)</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="menuTabPersonnes" class="menu-tab-panel hidden">
+        <p class="import-explainer">
+          Chaque personne a un nom et une couleur, utilisés dans cet espace pour repérer qui est
+          concerné.
+        </p>
+        <div id="personnesList" class="personnes-manage-list"></div>
+        <form id="personneForm">
+          <label>Nom
+            <input type="text" id="personneNom" required placeholder="Ex : Julie">
+          </label>
+          <label>Couleur
+            <div class="color-picker" id="personneColorPicker"></div>
+            <input type="hidden" id="personneCouleur">
+          </label>
+          <button type="submit" class="btn-primary">+ Ajouter cette personne</button>
+        </form>
+      </div>
+
+      <div id="menuTabAnimaux" class="menu-tab-panel hidden">
+        <p class="import-explainer">
+          Chaque animal a un nom et une couleur, utilisés dans l'espace Famille pour repérer qui est
+          concerné.
+        </p>
+        <div id="animauxList" class="personnes-manage-list"></div>
+        <form id="animalForm">
+          <label>Nom
+            <input type="text" id="animalNom" required placeholder="Ex : Rex">
+          </label>
+          <label>Couleur
+            <div class="color-picker" id="animalColorPicker"></div>
+            <input type="hidden" id="animalCouleur">
+          </label>
+          <button type="submit" class="btn-primary">+ Ajouter cet animal</button>
+        </form>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="backMenuBtn" class="btn-ghost">← Retour</button>
+        <div class="spacer"></div>
+        <button type="button" id="closeMenuDetailBtn" class="btn-ghost">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 id="modalTitle">Ajouter une activité</h2>
+      <form id="courseForm">
+        <input type="hidden" id="courseId">
+        <label>Activité
+          <input type="text" id="activite" required placeholder="Ex : Cours de maths, Sommeil, Basket...">
+        </label>
+        <label>Type
+          <select id="type">
+            <option value="ponctuel">Ponctuel (une seule date)</option>
+            <option value="hebdomadaire">Hebdomadaire (un jour fixe chaque semaine)</option>
+            <option value="quotidien">Quotidien (tous les jours)</option>
+          </select>
+        </label>
+        <div id="jourField">
+          <label>Jour
+            <select id="jour">
+              <option value="0">Lundi</option>
+              <option value="1">Mardi</option>
+              <option value="2">Mercredi</option>
+              <option value="3">Jeudi</option>
+              <option value="4">Vendredi</option>
+              <option value="5">Samedi</option>
+              <option value="6">Dimanche</option>
+            </select>
+          </label>
+          <label>Semaine
+            <select id="semaine">
+              <option value="toutes">Toutes les semaines</option>
+              <option value="A">Semaine A seulement</option>
+              <option value="B">Semaine B seulement</option>
+            </select>
+          </label>
+        </div>
+        <div id="dateField" class="hidden">
+          <label>Date
+            <input type="date" id="date">
+          </label>
+        </div>
+        <div id="dateDebutField">
+          <label>Date de début
+            <input type="date" id="dateDebut">
+          </label>
+        </div>
+        <div id="finField">
+          <label>Fin de la répétition
+            <select id="fin">
+              <option value="jamais">Jamais (se répète indéfiniment)</option>
+              <option value="apres_n">Après un nombre de fois précis</option>
+              <option value="date_fin">Jusqu'à une date précise</option>
+            </select>
+          </label>
+        </div>
+        <div id="nombreOccurrencesField" class="hidden">
+          <label>Nombre de répétitions
+            <input type="number" id="nombreOccurrences" min="1" value="5">
+          </label>
+        </div>
+        <div id="dateFinField" class="hidden">
+          <label>Jusqu'au
+            <input type="date" id="dateFin">
+          </label>
+        </div>
+        <div class="row">
+          <label>Début
+            <input type="time" id="heureDebut" step="300" required value="08:00">
+          </label>
+          <label>Fin (peut passer minuit)
+            <input type="time" id="heureFin" step="300" required value="09:00">
+          </label>
+        </div>
+        <div id="salleProfFields">
+          <label>Salle
+            <input type="text" id="salle" placeholder="B204">
+          </label>
+          <label>Prof
+            <input type="text" id="prof" placeholder="Mme Dupont">
+          </label>
+        </div>
+        <label>Importance
+          <select id="importance">
+            <option value="faible">Pas important (masqué du calendrier mensuel)</option>
+            <option value="important">Important (affiché sur le calendrier mensuel)</option>
+            <option value="tres_important">Très important (affiché en rouge)</option>
+          </select>
+        </label>
+        <div id="personneField" class="hidden">
+          <label>Personne(s)
+            <span class="field-hint">Coche plusieurs personnes pour diviser l'activité en plusieurs couleurs.</span>
+          </label>
+          <div id="personneCheckboxes" class="personnes-checkbox-list"></div>
+        </div>
+        <div id="animalField" class="hidden">
+          <label>Animal(aux)
+            <span class="field-hint">Coche un ou plusieurs animaux concernés par cette activité.</span>
+          </label>
+          <div id="animalCheckboxes" class="personnes-checkbox-list"></div>
+        </div>
+        <label id="couleurLabel">Couleur
+          <div class="color-picker" id="colorPicker">
+            <button type="button" class="swatch" data-color="#6C63FF" style="background:#6C63FF"></button>
+            <button type="button" class="swatch" data-color="#FF6B6B" style="background:#FF6B6B"></button>
+            <button type="button" class="swatch" data-color="#2EC4B6" style="background:#2EC4B6"></button>
+            <button type="button" class="swatch" data-color="#FFB703" style="background:#FFB703"></button>
+            <button type="button" class="swatch" data-color="#EF476F" style="background:#EF476F"></button>
+            <button type="button" class="swatch" data-color="#4361EE" style="background:#4361EE"></button>
+            <button type="button" class="swatch" data-color="#06D6A0" style="background:#06D6A0"></button>
+            <button type="button" class="swatch" data-color="#FF9F1C" style="background:#FF9F1C"></button>
+            <button type="button" class="swatch" data-color="#9B5DE5" style="background:#9B5DE5"></button>
+            <button type="button" class="swatch" data-color="#00BBF9" style="background:#00BBF9"></button>
+            <button type="button" class="swatch" data-color="#F15BB5" style="background:#F15BB5"></button>
+            <button type="button" class="swatch" data-color="#588157" style="background:#588157"></button>
+            <button type="button" class="swatch" data-color="#E63946" style="background:#E63946"></button>
+            <button type="button" class="swatch" data-color="#FFD60A" style="background:#FFD60A"></button>
+            <button type="button" class="swatch" data-color="#264653" style="background:#264653"></button>
+            <button type="button" class="swatch" data-color="#8338EC" style="background:#8338EC"></button>
+            <button type="button" class="swatch" data-color="#FB8500" style="background:#FB8500"></button>
+            <button type="button" class="swatch" data-color="#A0522D" style="background:#A0522D"></button>
+            <button type="button" class="swatch" data-color="#3A86FF" style="background:#3A86FF"></button>
+            <button type="button" class="swatch" data-color="#FF006E" style="background:#FF006E"></button>
+          </div>
+          <input type="hidden" id="couleur" value="#6C63FF">
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="deleteBtn" class="btn-danger hidden">Supprimer</button>
+          <div class="spacer"></div>
+          <button type="button" id="cancelBtn" class="btn-ghost">Annuler</button>
+          <button type="submit" class="btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="pdfReviewOverlay" class="modal-overlay hidden">
+    <div class="modal pdf-review-modal">
+      <h2>Vérifie les activités détectées</h2>
+      <p class="import-explainer">
+        Un PDF n'a pas de structure officielle comme un .ics : ce qui suit est une détection automatique,
+        probablement imparfaite. Corrige les champs, décoche ce qui ne va pas, puis valide.
+      </p>
+      <div id="pdfReviewList" class="pdf-review-list"></div>
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button type="button" id="cancelPdfReviewBtn" class="btn-ghost">Annuler</button>
+        <button type="button" id="confirmPdfReviewBtn" class="btn-primary">Importer la sélection</button>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
