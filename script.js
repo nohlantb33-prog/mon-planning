@@ -1705,6 +1705,7 @@ function applyEspaceUI() {
   }
 
   if (espace === "entreprise") entrepriseSelectedPersonneId = null;
+  if (espace === "famille") familleSelectedPersonneId = null;
   renderHints();
   switchView(currentView);
 
@@ -2414,11 +2415,59 @@ function switchView(view) {
   else renderMonthCalendar();
 }
 
+// Espace Famille, vue Mois : comme en Entreprise, on peut sélectionner une personne puis
+// cliquer sur des jours pour colorer le fond (ex : les jours où un parent travaille). Cliquer
+// sur un jour sans personne sélectionnée garde le comportement normal (ouvrir la vue Jour).
+let familleSelectedPersonneId = null;
+
+function renderFamillePersonnesRow() {
+  const row = document.getElementById("familleMonthPersonnesRow");
+  const estFamille = currentEspace() === "famille";
+  row.classList.toggle("hidden", !estFamille);
+  if (!estFamille) return;
+
+  const list = document.getElementById("famillePersonnesList");
+  list.innerHTML = "";
+  const personnes = loadPersonnes();
+  if (personnes.length === 0) {
+    list.innerHTML = '<p class="import-explainer">Ajoute des personnes dans Menu → 👥 Personnes pour commencer.</p>';
+    return;
+  }
+  personnes.forEach((p) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "personne-chip" + (p.id === familleSelectedPersonneId ? " selected" : "");
+    chip.innerHTML = `<span class="dot" style="background:${p.couleur}"></span><span>${escapeHtml(p.nom)}</span>`;
+    chip.addEventListener("click", () => {
+      familleSelectedPersonneId = familleSelectedPersonneId === p.id ? null : p.id;
+      renderMonthCalendar();
+    });
+    list.appendChild(chip);
+  });
+}
+
+function toggleFamilleAssignation(dateISO) {
+  const assignations = loadAssignations();
+  const idx = assignations.findIndex((a) => a.personneId === familleSelectedPersonneId && a.date === dateISO);
+  if (idx >= 0) {
+    assignations.splice(idx, 1);
+  } else {
+    assignations.push({ personneId: familleSelectedPersonneId, date: dateISO });
+  }
+  saveAssignations(assignations);
+  renderMonthCalendar();
+}
+
 function renderMonthCalendar() {
   const grid = document.getElementById("monthGrid");
   grid.innerHTML = "";
   const courses = loadCourses();
   const today = new Date();
+  const estFamille = currentEspace() === "famille";
+
+  renderFamillePersonnesRow();
+  const personnes = estFamille ? loadPersonnes() : [];
+  const assignations = estFamille ? loadAssignations() : [];
 
   const year = referenceDate.getFullYear();
   const month = referenceDate.getMonth();
@@ -2436,22 +2485,43 @@ function renderMonthCalendar() {
     const cellDate = new Date(gridStart);
     cellDate.setDate(gridStart.getDate() + i);
     const outsideMonth = cellDate.getMonth() !== month;
+    const iso = toISODate(cellDate);
 
     const cell = document.createElement("div");
     cell.className =
       "month-cell" +
       (outsideMonth ? " outside" : "") +
       (isSameDay(cellDate, today) ? " today" : "");
-    cell.title = "Voir ce jour en détail";
+    cell.title = familleSelectedPersonneId ? "Cliquer pour colorer/décolorer ce jour" : "Voir ce jour en détail";
     cell.addEventListener("click", () => {
-      dayReferenceDate = new Date(cellDate);
-      switchView("jour");
+      if (familleSelectedPersonneId) {
+        toggleFamilleAssignation(iso);
+      } else {
+        dayReferenceDate = new Date(cellDate);
+        switchView("jour");
+      }
     });
 
     const dateNum = document.createElement("div");
     dateNum.className = "date-num";
     dateNum.textContent = cellDate.getDate();
     cell.appendChild(dateNum);
+
+    if (estFamille) {
+      const colors = assignations
+        .filter((a) => a.date === iso)
+        .map((a) => personnes.find((p) => p.id === a.personneId)?.couleur)
+        .filter(Boolean);
+      if (colors.length === 1) {
+        cell.classList.add("filled");
+        cell.style.background = colors[0];
+      } else if (colors.length > 1) {
+        cell.classList.add("filled");
+        const step = 100 / colors.length;
+        const stops = colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(", ");
+        cell.style.background = `linear-gradient(135deg, ${stops})`;
+      }
+    }
 
     const importantCourses = courses
       .filter((c) => c.importance === "important" || c.importance === "tres_important")
@@ -2481,3 +2551,11 @@ function renderMonthCalendar() {
 initOnboarding();
 initEvents();
 applyEspaceUI();
+
+// Permet l'installation de l'app (icône + hors-ligne) : ne s'active que sur une connexion
+// sécurisée (HTTPS, ou localhost en local), comme l'exigent les navigateurs.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch((err) => console.warn("Service worker non enregistré :", err));
+  });
+}
