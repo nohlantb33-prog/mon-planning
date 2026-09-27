@@ -2048,6 +2048,22 @@ function habitStreak(habitId, checks) {
   return streak;
 }
 
+// Vue d'ensemble du mois, toutes habitudes confondues : % global + tableau récap.
+function renderHabitSummary(totalChecked, totalPossible) {
+  const el = document.getElementById("habitSummary");
+  el.classList.remove("hidden");
+  const pct = totalPossible ? Math.round((totalChecked / totalPossible) * 100) : 0;
+  const incomplete = totalPossible - totalChecked;
+  el.innerHTML = `
+    <div class="habit-summary-pct"><strong>${pct}%</strong><span>ce mois-ci</span></div>
+    <div class="habit-summary-stats">
+      <div><strong>${totalChecked}</strong><span>Complété</span></div>
+      <div><strong>${incomplete}</strong><span>Incomplet</span></div>
+      <div><strong>${totalPossible}</strong><span>Total</span></div>
+    </div>
+  `;
+}
+
 function renderHabitGrid() {
   const grid = document.getElementById("habitGrid");
   const listeId = currentTodoListeId();
@@ -2066,6 +2082,7 @@ function renderHabitGrid() {
   if (habits.length === 0) {
     grid.style.display = "block";
     grid.innerHTML = '<p class="import-explainer">Ajoute une première habitude ci-dessus pour commencer.</p>';
+    document.getElementById("habitSummary").classList.add("hidden");
     return;
   }
   grid.style.display = "grid";
@@ -2085,6 +2102,12 @@ function renderHabitGrid() {
   }
 
   const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
+
+  const totalPossible = habits.length * daysInMonth;
+  const totalChecked = checks.filter(
+    (c) => c.date.startsWith(monthPrefix) && habits.some((h) => h.id === c.habitId)
+  ).length;
+  renderHabitSummary(totalChecked, totalPossible);
 
   habits.forEach((h) => {
     const totalChecked = checks.filter((c) => c.habitId === h.id && c.date.startsWith(monthPrefix)).length;

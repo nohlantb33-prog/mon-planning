@@ -888,6 +888,51 @@ main {
 .habit-cell.today { box-shadow: inset 0 0 0 2px var(--primary); }
 .habit-cell.checked { background: var(--habit-color, var(--primary)); }
 
+.habit-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.habit-summary-pct {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+.habit-summary-pct strong {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+.habit-summary-pct span {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.habit-summary-stats {
+  display: flex;
+  gap: 24px;
+  margin-left: auto;
+}
+.habit-summary-stats div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.habit-summary-stats strong {
+  font-size: 1.1rem;
+  color: var(--text);
+}
+.habit-summary-stats span {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
 @media (max-width: 700px) {
   .todo-fullscreen-inner { flex-direction: column; }
   .todo-sidebar {
