@@ -8,6 +8,8 @@ const ASSIGNATIONS_KEY = "monPlanningAssignations";
 const TODO_LISTES_KEY = "monPlanningTodoListes";
 const TODO_ITEMS_KEY = "monPlanningTodoItems";
 const TODO_LISTE_ACTUELLE_KEY = "monPlanningTodoListeActuelle";
+const HABITS_KEY = "monPlanningHabitudes";
+const HABIT_CHECKS_KEY = "monPlanningHabitudeChecks";
 
 const ESPACES = [
   { id: "solo", label: "Solo", emoji: "🙋" },
@@ -263,6 +265,30 @@ function loadCurrentTodoListeId() {
 
 function saveCurrentTodoListeId(id) {
   localStorage.setItem(spaceKey(TODO_LISTE_ACTUELLE_KEY), id || "");
+}
+
+function loadHabits() {
+  try {
+    return JSON.parse(localStorage.getItem(spaceKey(HABITS_KEY))) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHabits(habits) {
+  localStorage.setItem(spaceKey(HABITS_KEY), JSON.stringify(habits));
+}
+
+function loadHabitChecks() {
+  try {
+    return JSON.parse(localStorage.getItem(spaceKey(HABIT_CHECKS_KEY))) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHabitChecks(checks) {
+  localStorage.setItem(spaceKey(HABIT_CHECKS_KEY), JSON.stringify(checks));
 }
 
 function loadAssignations() {
@@ -1848,6 +1874,11 @@ function addTodoListe(nom) {
 function deleteTodoListe(id) {
   saveTodoListes(loadTodoListes().filter((l) => l.id !== id));
   saveTodoItems(loadTodoItems().filter((i) => i.listeId !== id));
+  const habitIds = loadHabits()
+    .filter((h) => h.listeId === id)
+    .map((h) => h.id);
+  saveHabits(loadHabits().filter((h) => h.listeId !== id));
+  saveHabitChecks(loadHabitChecks().filter((c) => !habitIds.includes(c.habitId)));
   if (loadCurrentTodoListeId() === id) saveCurrentTodoListeId(null);
 }
 
@@ -1961,8 +1992,126 @@ function switchTodoView(mode) {
   todoViewMode = mode;
   document.getElementById("showTodoActiveView").classList.toggle("active", mode === "active");
   document.getElementById("showTodoDoneView").classList.toggle("active", mode === "done");
+  document.getElementById("showTodoHabitsView").classList.toggle("active", mode === "habits");
   document.getElementById("todoActiveView").classList.toggle("hidden", mode !== "active");
   document.getElementById("todoDoneView").classList.toggle("hidden", mode !== "done");
+  document.getElementById("todoHabitsView").classList.toggle("hidden", mode !== "habits");
+  if (mode === "habits") renderHabitGrid();
+}
+
+// --- Habitudes (à l'intérieur d'une liste To-do) : grille jour x habitude avec % et série ---
+
+let habitReferenceDate = new Date();
+
+function addHabit(listeId, nom) {
+  const habits = loadHabits();
+  const usedColors = new Set(habits.filter((h) => h.listeId === listeId).map((h) => h.couleur));
+  const swatchColors = Array.from(document.querySelectorAll("#colorPicker .swatch")).map((s) => s.dataset.color);
+  const couleur = swatchColors.find((c) => !usedColors.has(c)) || swatchColors[0];
+  habits.push({ id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8), listeId, nom, couleur });
+  saveHabits(habits);
+}
+
+function deleteHabit(id) {
+  saveHabits(loadHabits().filter((h) => h.id !== id));
+  saveHabitChecks(loadHabitChecks().filter((c) => c.habitId !== id));
+}
+
+function toggleHabitCheck(habitId, dateISO) {
+  const checks = loadHabitChecks();
+  const idx = checks.findIndex((c) => c.habitId === habitId && c.date === dateISO);
+  if (idx >= 0) {
+    checks.splice(idx, 1);
+  } else {
+    checks.push({ habitId, date: dateISO });
+  }
+  saveHabitChecks(checks);
+}
+
+// Nombre de jours d'affilée (en remontant à partir d'aujourd'hui) où l'habitude a été cochée.
+function habitStreak(habitId, checks) {
+  let streak = 0;
+  const d = new Date();
+  while (checks.some((c) => c.habitId === habitId && c.date === toISODate(d))) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+function renderHabitGrid() {
+  const grid = document.getElementById("habitGrid");
+  const listeId = currentTodoListeId();
+  const habits = loadHabits().filter((h) => h.listeId === listeId);
+  const checks = loadHabitChecks();
+  const today = new Date();
+
+  const year = habitReferenceDate.getFullYear();
+  const month = habitReferenceDate.getMonth();
+  document.getElementById("habitMonthLabel").textContent = new Date(year, month, 1).toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+  });
+
+  grid.innerHTML = "";
+  if (habits.length === 0) {
+    grid.style.display = "block";
+    grid.innerHTML = '<p class="import-explainer">Ajoute une première habitude ci-dessus pour commencer.</p>';
+    return;
+  }
+  grid.style.display = "grid";
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  grid.style.gridTemplateColumns = `150px repeat(${daysInMonth}, 28px)`;
+
+  grid.appendChild(document.createElement("div"));
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cellDate = new Date(year, month, d);
+    const head = document.createElement("div");
+    head.className = "habit-day-head" + (isSameDay(cellDate, today) ? " today" : "");
+    head.textContent = d;
+    grid.appendChild(head);
+  }
+
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
+
+  habits.forEach((h) => {
+    const totalChecked = checks.filter((c) => c.habitId === h.id && c.date.startsWith(monthPrefix)).length;
+    const pct = Math.round((totalChecked / daysInMonth) * 100);
+    const streak = habitStreak(h.id, checks);
+
+    const nameCell = document.createElement("div");
+    nameCell.className = "habit-name-cell";
+    nameCell.innerHTML = `<span class="dot" style="background:${h.couleur}"></span><span class="nom">${escapeHtml(h.nom)}</span><span class="habit-pct">${pct}%${streak > 0 ? " · 🔥" + streak : ""}</span>`;
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "habit-delete";
+    delBtn.textContent = "✕";
+    delBtn.title = "Supprimer cette habitude";
+    delBtn.addEventListener("click", () => {
+      if (!confirm(`Supprimer l'habitude "${h.nom}" ?`)) return;
+      deleteHabit(h.id);
+      renderHabitGrid();
+    });
+    nameCell.appendChild(delBtn);
+    grid.appendChild(nameCell);
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const cellDate = new Date(year, month, d);
+      const iso = toISODate(cellDate);
+      const checked = checks.some((c) => c.habitId === h.id && c.date === iso);
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "habit-cell" + (checked ? " checked" : "") + (isSameDay(cellDate, today) ? " today" : "");
+      cell.style.setProperty("--habit-color", h.couleur);
+      cell.title = `${h.nom} — ${cellDate.toLocaleDateString("fr-FR")}`;
+      cell.addEventListener("click", () => {
+        toggleHabitCheck(h.id, iso);
+        renderHabitGrid();
+      });
+      grid.appendChild(cell);
+    }
+  });
 }
 
 function renderTodoSpace() {
@@ -2344,6 +2493,26 @@ function initEvents() {
   });
   document.getElementById("showTodoActiveView").addEventListener("click", () => switchTodoView("active"));
   document.getElementById("showTodoDoneView").addEventListener("click", () => switchTodoView("done"));
+  document.getElementById("showTodoHabitsView").addEventListener("click", () => switchTodoView("habits"));
+
+  document.getElementById("habitAddForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("habitNouvelleHabitude");
+    const nom = input.value.trim();
+    const listeId = currentTodoListeId();
+    if (!nom || !listeId) return;
+    addHabit(listeId, nom);
+    input.value = "";
+    renderHabitGrid();
+  });
+  document.getElementById("prevHabitMonth").addEventListener("click", () => {
+    habitReferenceDate.setMonth(habitReferenceDate.getMonth() - 1);
+    renderHabitGrid();
+  });
+  document.getElementById("nextHabitMonth").addEventListener("click", () => {
+    habitReferenceDate.setMonth(habitReferenceDate.getMonth() + 1);
+    renderHabitGrid();
+  });
 
   document.getElementById("menuBtn").addEventListener("click", () => openMenuModal());
   document.getElementById("closeMenuBtn").addEventListener("click", closeMenuModal);

@@ -183,6 +183,7 @@
           <div class="view-switch todo-view-switch">
             <button type="button" id="showTodoActiveView" class="view-btn active">À faire</button>
             <button type="button" id="showTodoDoneView" class="view-btn">✅ Déjà fait</button>
+            <button type="button" id="showTodoHabitsView" class="view-btn">🔁 Habitudes</button>
           </div>
 
           <div id="todoActiveView">
@@ -195,6 +196,26 @@
 
           <div id="todoDoneView" class="hidden">
             <div id="todoDoneList" class="todo-list"></div>
+          </div>
+
+          <div id="todoHabitsView" class="hidden">
+            <p class="import-explainer">
+              Ajoute des habitudes à suivre chaque jour, puis coche les jours où tu les as tenues.
+            </p>
+            <form id="habitAddForm" class="todo-add-form">
+              <input type="text" id="habitNouvelleHabitude" placeholder="Nouvelle habitude (ex : Boire de l'eau 💧)">
+              <button type="submit" class="btn-primary">Ajouter</button>
+            </form>
+
+            <div class="week-nav">
+              <button type="button" id="prevHabitMonth" class="btn-ghost" aria-label="Mois précédent">←</button>
+              <div id="habitMonthLabel" class="week-label">Ce mois</div>
+              <button type="button" id="nextHabitMonth" class="btn-ghost" aria-label="Mois suivant">→</button>
+            </div>
+
+            <div class="habit-grid-wrap">
+              <div class="habit-grid" id="habitGrid"></div>
+            </div>
           </div>
         </div>
       </main>
