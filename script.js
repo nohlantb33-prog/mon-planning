@@ -1863,9 +1863,20 @@ function currentTodoListeId() {
   return listes.length ? listes[0].id : null;
 }
 
-function addTodoListe(nom) {
+// Type "normale" (à faire / déjà fait) par défaut si absent, pour rester compatible avec les
+// listes créées avant l'ajout du type "habitudes".
+function currentTodoListe() {
+  const id = currentTodoListeId();
+  return loadTodoListes().find((l) => l.id === id) || null;
+}
+
+function addTodoListe(nom, type) {
   const listes = loadTodoListes();
-  const liste = { id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8), nom };
+  const liste = {
+    id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
+    nom,
+    type: type === "habitudes" ? "habitudes" : "normale",
+  };
   listes.push(liste);
   saveTodoListes(listes);
   saveCurrentTodoListeId(liste.id);
@@ -1917,7 +1928,8 @@ function renderTodoListesSidebar() {
   listes.forEach((l) => {
     const row = document.createElement("div");
     row.className = "todo-sidebar-item" + (l.id === current ? " selected" : "");
-    row.innerHTML = `<span class="nom">${escapeHtml(l.nom)}</span>`;
+    const prefix = l.type === "habitudes" ? "🔁 " : "";
+    row.innerHTML = `<span class="nom">${prefix}${escapeHtml(l.nom)}</span>`;
     row.addEventListener("click", () => {
       saveCurrentTodoListeId(l.id);
       renderTodoSpace();
@@ -1992,14 +2004,11 @@ function switchTodoView(mode) {
   todoViewMode = mode;
   document.getElementById("showTodoActiveView").classList.toggle("active", mode === "active");
   document.getElementById("showTodoDoneView").classList.toggle("active", mode === "done");
-  document.getElementById("showTodoHabitsView").classList.toggle("active", mode === "habits");
   document.getElementById("todoActiveView").classList.toggle("hidden", mode !== "active");
   document.getElementById("todoDoneView").classList.toggle("hidden", mode !== "done");
-  document.getElementById("todoHabitsView").classList.toggle("hidden", mode !== "habits");
-  if (mode === "habits") renderHabitGrid();
 }
 
-// --- Habitudes (à l'intérieur d'une liste To-do) : grille jour x habitude avec % et série ---
+// --- Habitudes : listes To-do de type "habitudes", avec grille jour x habitude, % et série ---
 
 let habitReferenceDate = new Date();
 
@@ -2064,7 +2073,9 @@ function renderHabitGrid() {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   grid.style.gridTemplateColumns = `150px repeat(${daysInMonth}, 28px)`;
 
-  grid.appendChild(document.createElement("div"));
+  const corner = document.createElement("div");
+  corner.className = "habit-corner-cell";
+  grid.appendChild(corner);
   for (let d = 1; d <= daysInMonth; d++) {
     const cellDate = new Date(year, month, d);
     const head = document.createElement("div");
@@ -2118,12 +2129,21 @@ function renderTodoSpace() {
   const espace = ESPACES.find((e) => e.id === currentEspace());
   document.getElementById("todoModalEspace").textContent = `${espace.emoji} Espace ${espace.label}`;
   renderTodoListesSidebar();
-  const hasListe = !!currentTodoListeId();
-  document.getElementById("todoNoListe").classList.toggle("hidden", hasListe);
-  document.getElementById("todoContent").classList.toggle("hidden", !hasListe);
-  if (!hasListe) return;
-  switchTodoView(todoViewMode);
-  renderTodoLists();
+  const liste = currentTodoListe();
+  document.getElementById("todoNoListe").classList.toggle("hidden", !!liste);
+  document.getElementById("todoContent").classList.toggle("hidden", !liste);
+  if (!liste) return;
+
+  const estHabitudes = liste.type === "habitudes";
+  document.getElementById("todoNormalContent").classList.toggle("hidden", estHabitudes);
+  document.getElementById("todoHabitsContent").classList.toggle("hidden", !estHabitudes);
+
+  if (estHabitudes) {
+    renderHabitGrid();
+  } else {
+    switchTodoView(todoViewMode);
+    renderTodoLists();
+  }
 }
 
 function openTodoModal() {
@@ -2465,6 +2485,7 @@ function initEvents() {
     renderEntrepriseMonth();
   });
 
+  let nouvelleListeType = "normale";
   document.getElementById("addTodoListeBtn").addEventListener("click", () => {
     document.getElementById("todoListeForm").classList.remove("hidden");
     document.getElementById("todoListeNom").focus();
@@ -2473,13 +2494,25 @@ function initEvents() {
     document.getElementById("todoListeForm").classList.add("hidden");
     document.getElementById("todoListeNom").value = "";
   });
+  document.querySelectorAll("#todoListeTypeSwitch .todo-liste-type-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      nouvelleListeType = btn.dataset.type;
+      document
+        .querySelectorAll("#todoListeTypeSwitch .todo-liste-type-btn")
+        .forEach((b) => b.classList.toggle("active", b === btn));
+    });
+  });
   document.getElementById("todoListeForm").addEventListener("submit", (e) => {
     e.preventDefault();
     const nom = document.getElementById("todoListeNom").value.trim();
     if (!nom) return;
-    addTodoListe(nom);
+    addTodoListe(nom, nouvelleListeType);
     document.getElementById("todoListeNom").value = "";
     document.getElementById("todoListeForm").classList.add("hidden");
+    nouvelleListeType = "normale";
+    document.querySelectorAll("#todoListeTypeSwitch .todo-liste-type-btn").forEach((b, i) => {
+      b.classList.toggle("active", i === 0);
+    });
     todoViewMode = "active";
     renderTodoSpace();
   });
@@ -2493,7 +2526,6 @@ function initEvents() {
   });
   document.getElementById("showTodoActiveView").addEventListener("click", () => switchTodoView("active"));
   document.getElementById("showTodoDoneView").addEventListener("click", () => switchTodoView("done"));
-  document.getElementById("showTodoHabitsView").addEventListener("click", () => switchTodoView("habits"));
 
   document.getElementById("habitAddForm").addEventListener("submit", (e) => {
     e.preventDefault();
