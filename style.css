@@ -1013,13 +1013,15 @@ main {
 }
 
 .month-cell {
-  min-height: 110px;
+  height: 110px;
   padding: 6px;
   border-left: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow-y: auto;
+  overflow-x: hidden;
   cursor: pointer;
   transition: background-color 0.15s ease;
 }
@@ -1062,7 +1064,7 @@ main {
 }
 
 @media (max-width: 720px) {
-  .month-cell { min-height: 70px; }
+  .month-cell { height: 76px; }
   .chip { font-size: 0.6rem; }
   .calendar {
     grid-template-columns: 40px repeat(7, minmax(80px, 1fr));
