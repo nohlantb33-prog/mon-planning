@@ -162,6 +162,9 @@
         </div>
         <div id="todoModalEspace" class="todo-sidebar-espace"></div>
 
+        <div id="todoFixedEntries" class="todo-sidebar-list todo-sidebar-fixed-list"></div>
+        <div class="todo-sidebar-separator"></div>
+
         <button type="button" id="addTodoListeBtn" class="todo-new-liste-btn">+ Nouvelle liste</button>
         <form id="todoListeForm" class="todo-liste-form hidden">
           <input type="text" id="todoListeNom" placeholder="Nom de la liste (ex : Courses)">
@@ -179,12 +182,44 @@
       </aside>
 
       <main class="todo-main">
-        <div id="todoNoListe" class="todo-empty hidden">
-          <p>Crée ta première liste pour commencer.</p>
-        </div>
+        <div id="todoContent">
+          <div id="todoDashboardContent" class="hidden">
+            <section class="dashboard-section">
+              <h3>🎯 Aujourd'hui</h3>
+              <div id="dashboardDayTasks" class="todo-list"></div>
+            </section>
 
-        <div id="todoContent" class="hidden">
-          <div id="todoNormalContent">
+            <section class="dashboard-section">
+              <h3>🔁 Routines</h3>
+              <div id="dashboardHabits"></div>
+            </section>
+
+            <section class="dashboard-section">
+              <h3>✅ Mes listes</h3>
+              <div id="dashboardListes"></div>
+            </section>
+          </div>
+
+          <div id="todoDayTasksContent" class="hidden">
+            <p class="import-explainer">
+              Prépare tes tâches à l'avance : écris aujourd'hui ce que tu as à faire demain, pour
+              n'avoir plus qu'à l'exécuter le jour venu.
+            </p>
+            <div class="habit-daytasks-header">
+              <span>🎯 Tâches du jour</span>
+              <div class="habit-day-switch" id="dayTasksDaySwitch">
+                <button type="button" class="habit-day-btn active" data-offset="0">Aujourd'hui</button>
+                <button type="button" class="habit-day-btn" data-offset="1">Demain</button>
+              </div>
+            </div>
+            <form id="dayTaskAddForm" class="todo-add-form">
+              <input type="text" id="dayTaskNouvelleTache" placeholder="Ajouter une tâche pour ce jour...">
+              <button type="submit" class="btn-primary">Ajouter</button>
+            </form>
+            <div id="dayTaskList" class="todo-list"></div>
+          </div>
+
+          <div id="todoNormalContent" class="hidden">
             <div class="view-switch todo-view-switch">
               <button type="button" id="showTodoActiveView" class="view-btn active">À faire</button>
               <button type="button" id="showTodoDoneView" class="view-btn">✅ Déjà fait</button>
@@ -207,21 +242,6 @@
             <p class="import-explainer">
               Ajoute des habitudes à suivre chaque jour, puis coche les jours où tu les as tenues.
             </p>
-
-            <div class="habit-daytasks">
-              <div class="habit-daytasks-header">
-                <span>📋 Tâches à préparer</span>
-                <div class="habit-day-switch" id="habitDaySwitch">
-                  <button type="button" class="habit-day-btn active" data-offset="0">Aujourd'hui</button>
-                  <button type="button" class="habit-day-btn" data-offset="1">Demain</button>
-                </div>
-              </div>
-              <form id="habitTaskAddForm" class="todo-add-form">
-                <input type="text" id="habitNouvelleTache" placeholder="Ajouter une tâche pour ce jour...">
-                <button type="submit" class="btn-primary">Ajouter</button>
-              </form>
-              <div id="habitTaskList" class="todo-list"></div>
-            </div>
 
             <form id="habitAddForm" class="todo-add-form">
               <input type="text" id="habitNouvelleHabitude" placeholder="Nouvelle habitude (ex : Boire de l'eau 💧)">

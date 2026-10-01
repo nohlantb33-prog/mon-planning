@@ -292,7 +292,9 @@ function saveHabitChecks(checks) {
   localStorage.setItem(spaceKey(HABIT_CHECKS_KEY), JSON.stringify(checks));
 }
 
-function loadHabitDayTasks() {
+// Tâches du jour : indépendantes de toute liste (une seule entrée fixe par espace), pour
+// préparer à l'avance ce qu'il y a à faire aujourd'hui ou demain.
+function loadDayTasks() {
   try {
     return JSON.parse(localStorage.getItem(spaceKey(HABIT_DAYTASKS_KEY))) || [];
   } catch {
@@ -300,32 +302,31 @@ function loadHabitDayTasks() {
   }
 }
 
-function saveHabitDayTasks(tasks) {
+function saveDayTasks(tasks) {
   localStorage.setItem(spaceKey(HABIT_DAYTASKS_KEY), JSON.stringify(tasks));
 }
 
-function addHabitDayTask(listeId, dateISO, texte) {
-  const tasks = loadHabitDayTasks();
+function addDayTask(dateISO, texte) {
+  const tasks = loadDayTasks();
   tasks.push({
     id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
-    listeId,
     date: dateISO,
     texte: texte.trim(),
     fait: false,
   });
-  saveHabitDayTasks(tasks);
+  saveDayTasks(tasks);
 }
 
-function toggleHabitDayTask(id) {
-  const tasks = loadHabitDayTasks();
+function toggleDayTask(id) {
+  const tasks = loadDayTasks();
   const task = tasks.find((t) => t.id === id);
   if (!task) return;
   task.fait = !task.fait;
-  saveHabitDayTasks(tasks);
+  saveDayTasks(tasks);
 }
 
-function deleteHabitDayTask(id) {
-  saveHabitDayTasks(loadHabitDayTasks().filter((t) => t.id !== id));
+function deleteDayTask(id) {
+  saveDayTasks(loadDayTasks().filter((t) => t.id !== id));
 }
 
 function loadAssignations() {
@@ -1889,22 +1890,33 @@ function addAnimal(nom, couleur) {
   saveAnimaux(animaux);
 }
 
-// --- Espace To-do : plusieurs listes nommées, chacune avec des tâches à faire / déjà faites ---
+// --- Espace To-do : tableau de bord + tâches du jour (entrées fixes) + listes nommées ---
 
 let todoViewMode = "active"; // "active" ou "done"
 
-function currentTodoListeId() {
+const TODO_SPECIAL_DASHBOARD = "__dashboard__";
+const TODO_SPECIAL_DAYTASKS = "__daytasks__";
+
+// Ce qui est actuellement sélectionné dans la barre latérale : le tableau de bord, les tâches
+// du jour, ou une vraie liste. Par défaut (rien de valide en mémoire) : le tableau de bord.
+function currentTodoSelection() {
   const id = loadCurrentTodoListeId();
+  if (id === TODO_SPECIAL_DASHBOARD || id === TODO_SPECIAL_DAYTASKS) return id;
   const listes = loadTodoListes();
   if (id && listes.some((l) => l.id === id)) return id;
-  return listes.length ? listes[0].id : null;
+  return TODO_SPECIAL_DASHBOARD;
 }
 
-// Type "normale" (à faire / déjà fait) par défaut si absent, pour rester compatible avec les
-// listes créées avant l'ajout du type "habitudes".
+// Id de la vraie liste sélectionnée, ou null si c'est une entrée fixe (tableau de bord / tâches
+// du jour) qui est affichée.
+function currentTodoListeId() {
+  const sel = currentTodoSelection();
+  return sel === TODO_SPECIAL_DASHBOARD || sel === TODO_SPECIAL_DAYTASKS ? null : sel;
+}
+
 function currentTodoListe() {
   const id = currentTodoListeId();
-  return loadTodoListes().find((l) => l.id === id) || null;
+  return id ? loadTodoListes().find((l) => l.id === id) || null : null;
 }
 
 function addTodoListe(nom, type) {
@@ -1927,7 +1939,6 @@ function deleteTodoListe(id) {
     .map((h) => h.id);
   saveHabits(loadHabits().filter((h) => h.listeId !== id));
   saveHabitChecks(loadHabitChecks().filter((c) => !habitIds.includes(c.habitId)));
-  saveHabitDayTasks(loadHabitDayTasks().filter((t) => t.listeId !== id));
   if (loadCurrentTodoListeId() === id) saveCurrentTodoListeId(null);
 }
 
@@ -1958,7 +1969,29 @@ function deleteTodoItem(id) {
   saveTodoItems(loadTodoItems().filter((i) => i.id !== id));
 }
 
+function renderTodoFixedEntries() {
+  const container = document.getElementById("todoFixedEntries");
+  container.innerHTML = "";
+  const selection = currentTodoSelection();
+
+  const entries = [
+    { id: TODO_SPECIAL_DASHBOARD, label: "📊 Tableau de bord" },
+    { id: TODO_SPECIAL_DAYTASKS, label: "🎯 Tâches du jour" },
+  ];
+  entries.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "todo-sidebar-item" + (entry.id === selection ? " selected" : "");
+    row.innerHTML = `<span class="nom">${entry.label}</span>`;
+    row.addEventListener("click", () => {
+      saveCurrentTodoListeId(entry.id);
+      renderTodoSpace();
+    });
+    container.appendChild(row);
+  });
+}
+
 function renderTodoListesSidebar() {
+  renderTodoFixedEntries();
   const list = document.getElementById("todoListesList");
   list.innerHTML = "";
   const listes = loadTodoListes();
@@ -2099,24 +2132,24 @@ function toggleHabitCheck(habitId, dateISO) {
   saveHabitChecks(checks);
 }
 
-// Liste de tâches à préparer pour un jour précis (aujourd'hui ou demain) : pensées à l'avance,
-// pour n'avoir qu'à les exécuter le jour venu sans se demander quoi faire.
-let habitTaskDayOffset = 0; // 0 = aujourd'hui, 1 = demain
+// Tâches à préparer pour un jour précis (aujourd'hui ou demain) : pensées à l'avance, pour
+// n'avoir qu'à les exécuter le jour venu sans se demander quoi faire. Entrée fixe de la barre
+// latérale, indépendante des listes.
+let dayTasksOffset = 0; // 0 = aujourd'hui, 1 = demain
 
-function habitTaskDateISO() {
+function dayTasksSelectedDateISO() {
   const d = new Date();
-  d.setDate(d.getDate() + habitTaskDayOffset);
+  d.setDate(d.getDate() + dayTasksOffset);
   return toISODate(d);
 }
 
-function renderHabitDayTasks(listeId) {
-  const dateISO = habitTaskDateISO();
-  const tasks = loadHabitDayTasks().filter((t) => t.listeId === listeId && t.date === dateISO);
-  const list = document.getElementById("habitTaskList");
-  list.innerHTML = "";
+// Affiche, dans le conteneur donné, les tâches du jour `dateISO`. `onChange` est appelé après
+// chaque coche/suppression pour que l'appelant (page dédiée ou tableau de bord) se rafraîchisse.
+function renderDayTasksInto(container, dateISO, emptyLabel, onChange) {
+  const tasks = loadDayTasks().filter((t) => t.date === dateISO);
+  container.innerHTML = "";
   if (tasks.length === 0) {
-    const label = habitTaskDayOffset === 0 ? "pour l'instant" : "pour demain";
-    list.innerHTML = `<p class="import-explainer">Rien de prévu ${label}.</p>`;
+    container.innerHTML = `<p class="import-explainer">${emptyLabel}</p>`;
     return;
   }
   tasks.forEach((t) => {
@@ -2128,8 +2161,8 @@ function renderHabitDayTasks(listeId) {
     main.className = "todo-item-main";
     main.innerHTML = `<span class="todo-check">${t.fait ? "✓" : ""}</span><span class="todo-texte">${escapeHtml(t.texte)}</span>`;
     main.addEventListener("click", () => {
-      toggleHabitDayTask(t.id);
-      renderHabitDayTasks(listeId);
+      toggleDayTask(t.id);
+      onChange();
     });
 
     const delBtn = document.createElement("button");
@@ -2138,13 +2171,93 @@ function renderHabitDayTasks(listeId) {
     delBtn.textContent = "✕";
     delBtn.title = "Supprimer définitivement";
     delBtn.addEventListener("click", () => {
-      deleteHabitDayTask(t.id);
-      renderHabitDayTasks(listeId);
+      deleteDayTask(t.id);
+      onChange();
     });
 
     row.append(main, delBtn);
-    list.appendChild(row);
+    container.appendChild(row);
   });
+}
+
+function renderDayTasksPage() {
+  const dateISO = dayTasksSelectedDateISO();
+  const label = dayTasksOffset === 0 ? "Rien de prévu pour l'instant." : "Rien de prévu pour demain.";
+  renderDayTasksInto(document.getElementById("dayTaskList"), dateISO, label, renderDayTasksPage);
+}
+
+// --- Tableau de bord : aujourd'hui, routines, et aperçu des listes existantes ---
+
+function renderDashboard() {
+  renderDayTasksInto(
+    document.getElementById("dashboardDayTasks"),
+    toISODate(new Date()),
+    "Rien de prévu pour aujourd'hui.",
+    renderDashboard
+  );
+
+  const todayISO = toISODate(new Date());
+  const habits = loadHabits();
+  const checks = loadHabitChecks();
+  const habitListes = loadTodoListes().filter((l) => l.type === "habitudes" && habits.some((h) => h.listeId === l.id));
+  const habitsEl = document.getElementById("dashboardHabits");
+  habitsEl.innerHTML = "";
+  if (habitListes.length === 0) {
+    habitsEl.innerHTML = '<p class="import-explainer">Crée une liste d\'habitudes pour voir tes routines ici.</p>';
+  } else {
+    habitListes.forEach((liste) => {
+      const group = document.createElement("div");
+      group.className = "dashboard-habit-group";
+      const title = document.createElement("div");
+      title.className = "dashboard-habit-group-title";
+      title.textContent = liste.nom;
+      group.appendChild(title);
+
+      const rows = document.createElement("div");
+      rows.className = "todo-list";
+      habits
+        .filter((h) => h.listeId === liste.id)
+        .forEach((h) => {
+          const checked = checks.some((c) => c.habitId === h.id && c.date === todayISO);
+          const row = document.createElement("div");
+          row.className = "todo-item" + (checked ? " done" : "");
+          const main = document.createElement("button");
+          main.type = "button";
+          main.className = "todo-item-main";
+          const checkStyle = checked ? ` style="background:${h.couleur};border-color:${h.couleur}"` : "";
+          main.innerHTML = `<span class="todo-check"${checkStyle}>${checked ? "✓" : ""}</span><span class="todo-texte">${escapeHtml(h.nom)}</span>`;
+          main.addEventListener("click", () => {
+            toggleHabitCheck(h.id, todayISO);
+            renderDashboard();
+          });
+          row.appendChild(main);
+          rows.appendChild(row);
+        });
+      group.appendChild(rows);
+      habitsEl.appendChild(group);
+    });
+  }
+
+  const normalListes = loadTodoListes().filter((l) => l.type !== "habitudes");
+  const items = loadTodoItems();
+  const listesEl = document.getElementById("dashboardListes");
+  listesEl.innerHTML = "";
+  if (normalListes.length === 0) {
+    listesEl.innerHTML = '<p class="import-explainer">Crée une liste pour la voir apparaître ici.</p>';
+  } else {
+    normalListes.forEach((liste) => {
+      const pending = items.filter((i) => i.listeId === liste.id && !i.fait).length;
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "dashboard-liste-row";
+      row.innerHTML = `<span>${escapeHtml(liste.nom)}</span><span class="dashboard-liste-count">${pending} à faire</span>`;
+      row.addEventListener("click", () => {
+        saveCurrentTodoListeId(liste.id);
+        renderTodoSpace();
+      });
+      listesEl.appendChild(row);
+    });
+  }
 }
 
 // Nombre de jours d'affilée (en remontant à partir d'aujourd'hui) où l'habitude a été cochée.
@@ -2181,8 +2294,6 @@ function renderHabitGrid() {
   const habits = loadHabits().filter((h) => h.listeId === listeId);
   const checks = loadHabitChecks();
   const today = new Date();
-
-  renderHabitDayTasks(listeId);
 
   const year = habitReferenceDate.getFullYear();
   const month = habitReferenceDate.getMonth();
@@ -2265,18 +2376,24 @@ function renderTodoSpace() {
   const espace = ESPACES.find((e) => e.id === currentEspace());
   document.getElementById("todoModalEspace").textContent = `${espace.emoji} Espace ${espace.label}`;
   renderTodoListesSidebar();
-  const liste = currentTodoListe();
-  document.getElementById("todoNoListe").classList.toggle("hidden", !!liste);
-  document.getElementById("todoContent").classList.toggle("hidden", !liste);
-  if (!liste) return;
 
-  const estHabitudes = liste.type === "habitudes";
-  document.getElementById("todoNormalContent").classList.toggle("hidden", estHabitudes);
+  const selection = currentTodoSelection();
+  const liste = currentTodoListe();
+  const estHabitudes = !!liste && liste.type === "habitudes";
+  const estNormale = !!liste && !estHabitudes;
+
+  document.getElementById("todoDashboardContent").classList.toggle("hidden", selection !== TODO_SPECIAL_DASHBOARD);
+  document.getElementById("todoDayTasksContent").classList.toggle("hidden", selection !== TODO_SPECIAL_DAYTASKS);
+  document.getElementById("todoNormalContent").classList.toggle("hidden", !estNormale);
   document.getElementById("todoHabitsContent").classList.toggle("hidden", !estHabitudes);
 
-  if (estHabitudes) {
+  if (selection === TODO_SPECIAL_DASHBOARD) {
+    renderDashboard();
+  } else if (selection === TODO_SPECIAL_DAYTASKS) {
+    renderDayTasksPage();
+  } else if (estHabitudes) {
     renderHabitGrid();
-  } else {
+  } else if (estNormale) {
     switchTodoView(todoViewMode);
     renderTodoLists();
   }
@@ -2690,24 +2807,23 @@ function initEvents() {
       renderHabitGrid();
     });
   });
-  document.querySelectorAll("#habitDaySwitch .habit-day-btn").forEach((btn) => {
+  document.querySelectorAll("#dayTasksDaySwitch .habit-day-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      habitTaskDayOffset = Number(btn.dataset.offset);
+      dayTasksOffset = Number(btn.dataset.offset);
       document
-        .querySelectorAll("#habitDaySwitch .habit-day-btn")
+        .querySelectorAll("#dayTasksDaySwitch .habit-day-btn")
         .forEach((b) => b.classList.toggle("active", b === btn));
-      renderHabitDayTasks(currentTodoListeId());
+      renderDayTasksPage();
     });
   });
-  document.getElementById("habitTaskAddForm").addEventListener("submit", (e) => {
+  document.getElementById("dayTaskAddForm").addEventListener("submit", (e) => {
     e.preventDefault();
-    const input = document.getElementById("habitNouvelleTache");
+    const input = document.getElementById("dayTaskNouvelleTache");
     const texte = input.value;
-    const listeId = currentTodoListeId();
-    if (!texte.trim() || !listeId) return;
-    addHabitDayTask(listeId, habitTaskDateISO(), texte);
+    if (!texte.trim()) return;
+    addDayTask(dayTasksSelectedDateISO(), texte);
     input.value = "";
-    renderHabitDayTasks(listeId);
+    renderDayTasksPage();
   });
 
   document.getElementById("menuBtn").addEventListener("click", () => openMenuModal());
