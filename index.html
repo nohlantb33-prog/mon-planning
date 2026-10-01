@@ -208,9 +208,19 @@
               Ajoute des habitudes à suivre chaque jour, puis coche les jours où tu les as tenues.
             </p>
 
-            <div class="habit-goal-row">
-              <label for="habitGoalInput">🎯 Objectif du jour</label>
-              <input type="text" id="habitGoalInput" placeholder="Écris ton objectif pour aujourd'hui...">
+            <div class="habit-daytasks">
+              <div class="habit-daytasks-header">
+                <span>📋 Tâches à préparer</span>
+                <div class="habit-day-switch" id="habitDaySwitch">
+                  <button type="button" class="habit-day-btn active" data-offset="0">Aujourd'hui</button>
+                  <button type="button" class="habit-day-btn" data-offset="1">Demain</button>
+                </div>
+              </div>
+              <form id="habitTaskAddForm" class="todo-add-form">
+                <input type="text" id="habitNouvelleTache" placeholder="Ajouter une tâche pour ce jour...">
+                <button type="submit" class="btn-primary">Ajouter</button>
+              </form>
+              <div id="habitTaskList" class="todo-list"></div>
             </div>
 
             <form id="habitAddForm" class="todo-add-form">

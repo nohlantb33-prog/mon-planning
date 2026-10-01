@@ -10,7 +10,7 @@ const TODO_ITEMS_KEY = "monPlanningTodoItems";
 const TODO_LISTE_ACTUELLE_KEY = "monPlanningTodoListeActuelle";
 const HABITS_KEY = "monPlanningHabitudes";
 const HABIT_CHECKS_KEY = "monPlanningHabitudeChecks";
-const HABIT_GOALS_KEY = "monPlanningHabitudeObjectifs";
+const HABIT_DAYTASKS_KEY = "monPlanningHabitudeTaches";
 
 const ESPACES = [
   { id: "solo", label: "Solo", emoji: "🙋" },
@@ -292,34 +292,40 @@ function saveHabitChecks(checks) {
   localStorage.setItem(spaceKey(HABIT_CHECKS_KEY), JSON.stringify(checks));
 }
 
-function loadHabitGoals() {
+function loadHabitDayTasks() {
   try {
-    return JSON.parse(localStorage.getItem(spaceKey(HABIT_GOALS_KEY))) || [];
+    return JSON.parse(localStorage.getItem(spaceKey(HABIT_DAYTASKS_KEY))) || [];
   } catch {
     return [];
   }
 }
 
-function saveHabitGoals(goals) {
-  localStorage.setItem(spaceKey(HABIT_GOALS_KEY), JSON.stringify(goals));
+function saveHabitDayTasks(tasks) {
+  localStorage.setItem(spaceKey(HABIT_DAYTASKS_KEY), JSON.stringify(tasks));
 }
 
-function getHabitGoal(listeId, dateISO) {
-  const goal = loadHabitGoals().find((g) => g.listeId === listeId && g.date === dateISO);
-  return goal ? goal.texte : "";
+function addHabitDayTask(listeId, dateISO, texte) {
+  const tasks = loadHabitDayTasks();
+  tasks.push({
+    id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
+    listeId,
+    date: dateISO,
+    texte: texte.trim(),
+    fait: false,
+  });
+  saveHabitDayTasks(tasks);
 }
 
-function setHabitGoal(listeId, dateISO, texte) {
-  const goals = loadHabitGoals();
-  const idx = goals.findIndex((g) => g.listeId === listeId && g.date === dateISO);
-  if (!texte.trim()) {
-    if (idx >= 0) goals.splice(idx, 1);
-  } else if (idx >= 0) {
-    goals[idx].texte = texte;
-  } else {
-    goals.push({ listeId, date: dateISO, texte });
-  }
-  saveHabitGoals(goals);
+function toggleHabitDayTask(id) {
+  const tasks = loadHabitDayTasks();
+  const task = tasks.find((t) => t.id === id);
+  if (!task) return;
+  task.fait = !task.fait;
+  saveHabitDayTasks(tasks);
+}
+
+function deleteHabitDayTask(id) {
+  saveHabitDayTasks(loadHabitDayTasks().filter((t) => t.id !== id));
 }
 
 function loadAssignations() {
@@ -1921,7 +1927,7 @@ function deleteTodoListe(id) {
     .map((h) => h.id);
   saveHabits(loadHabits().filter((h) => h.listeId !== id));
   saveHabitChecks(loadHabitChecks().filter((c) => !habitIds.includes(c.habitId)));
-  saveHabitGoals(loadHabitGoals().filter((g) => g.listeId !== id));
+  saveHabitDayTasks(loadHabitDayTasks().filter((t) => t.listeId !== id));
   if (loadCurrentTodoListeId() === id) saveCurrentTodoListeId(null);
 }
 
@@ -2093,6 +2099,54 @@ function toggleHabitCheck(habitId, dateISO) {
   saveHabitChecks(checks);
 }
 
+// Liste de tâches à préparer pour un jour précis (aujourd'hui ou demain) : pensées à l'avance,
+// pour n'avoir qu'à les exécuter le jour venu sans se demander quoi faire.
+let habitTaskDayOffset = 0; // 0 = aujourd'hui, 1 = demain
+
+function habitTaskDateISO() {
+  const d = new Date();
+  d.setDate(d.getDate() + habitTaskDayOffset);
+  return toISODate(d);
+}
+
+function renderHabitDayTasks(listeId) {
+  const dateISO = habitTaskDateISO();
+  const tasks = loadHabitDayTasks().filter((t) => t.listeId === listeId && t.date === dateISO);
+  const list = document.getElementById("habitTaskList");
+  list.innerHTML = "";
+  if (tasks.length === 0) {
+    const label = habitTaskDayOffset === 0 ? "pour l'instant" : "pour demain";
+    list.innerHTML = `<p class="import-explainer">Rien de prévu ${label}.</p>`;
+    return;
+  }
+  tasks.forEach((t) => {
+    const row = document.createElement("div");
+    row.className = "todo-item" + (t.fait ? " done" : "");
+
+    const main = document.createElement("button");
+    main.type = "button";
+    main.className = "todo-item-main";
+    main.innerHTML = `<span class="todo-check">${t.fait ? "✓" : ""}</span><span class="todo-texte">${escapeHtml(t.texte)}</span>`;
+    main.addEventListener("click", () => {
+      toggleHabitDayTask(t.id);
+      renderHabitDayTasks(listeId);
+    });
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "todo-delete";
+    delBtn.textContent = "✕";
+    delBtn.title = "Supprimer définitivement";
+    delBtn.addEventListener("click", () => {
+      deleteHabitDayTask(t.id);
+      renderHabitDayTasks(listeId);
+    });
+
+    row.append(main, delBtn);
+    list.appendChild(row);
+  });
+}
+
 // Nombre de jours d'affilée (en remontant à partir d'aujourd'hui) où l'habitude a été cochée.
 function habitStreak(habitId, checks) {
   let streak = 0;
@@ -2128,7 +2182,7 @@ function renderHabitGrid() {
   const checks = loadHabitChecks();
   const today = new Date();
 
-  document.getElementById("habitGoalInput").value = getHabitGoal(listeId, toISODate(today));
+  renderHabitDayTasks(listeId);
 
   const year = habitReferenceDate.getFullYear();
   const month = habitReferenceDate.getMonth();
@@ -2636,10 +2690,24 @@ function initEvents() {
       renderHabitGrid();
     });
   });
-  document.getElementById("habitGoalInput").addEventListener("input", (e) => {
+  document.querySelectorAll("#habitDaySwitch .habit-day-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      habitTaskDayOffset = Number(btn.dataset.offset);
+      document
+        .querySelectorAll("#habitDaySwitch .habit-day-btn")
+        .forEach((b) => b.classList.toggle("active", b === btn));
+      renderHabitDayTasks(currentTodoListeId());
+    });
+  });
+  document.getElementById("habitTaskAddForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("habitNouvelleTache");
+    const texte = input.value;
     const listeId = currentTodoListeId();
-    if (!listeId) return;
-    setHabitGoal(listeId, toISODate(new Date()), e.target.value);
+    if (!texte.trim() || !listeId) return;
+    addHabitDayTask(listeId, habitTaskDateISO(), texte);
+    input.value = "";
+    renderHabitDayTasks(listeId);
   });
 
   document.getElementById("menuBtn").addEventListener("click", () => openMenuModal());
