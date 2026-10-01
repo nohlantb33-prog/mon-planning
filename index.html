@@ -360,6 +360,15 @@
           <label>Nom
             <input type="text" id="personneNom" required placeholder="Ex : Julie">
           </label>
+          <div id="personneFamilleFields" class="hidden">
+            <label>Âge
+              <input type="number" id="personneAge" min="0" max="120" placeholder="Ex : 42">
+            </label>
+            <label class="import-checkbox">
+              <input type="checkbox" id="personneTravaille">
+              Cette personne travaille
+            </label>
+          </div>
           <label>Couleur
             <div class="color-picker" id="personneColorPicker"></div>
             <input type="hidden" id="personneCouleur">

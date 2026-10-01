@@ -360,6 +360,33 @@ function isSameDay(a, b) {
   return a.toDateString() === b.toDateString();
 }
 
+function hexToRgba(hex, alpha) {
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const num = parseInt(h, 16);
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Couleur(s) de présence (Entreprise / Famille) appliquée en fond de case, volontairement très
+// discrète (légère teinte) pour ne pas dominer visuellement tout le calendrier.
+const PRESENCE_FILL_ALPHA = 0.16;
+
+function applyPresenceFill(cell, colors) {
+  if (colors.length === 0) return;
+  cell.classList.add("filled");
+  const pale = colors.map((c) => hexToRgba(c, PRESENCE_FILL_ALPHA));
+  if (pale.length === 1) {
+    cell.style.background = pale[0];
+  } else {
+    const step = 100 / pale.length;
+    const stops = pale.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(", ");
+    cell.style.background = `linear-gradient(135deg, ${stops})`;
+  }
+}
+
 function toISODate(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -1804,6 +1831,8 @@ function renderPersonneColorPicker() {
 
 function renderPersonnesManageList() {
   renderPersonneColorPicker();
+  document.getElementById("personneFamilleFields").classList.toggle("hidden", currentEspace() !== "famille");
+
   const list = document.getElementById("personnesList");
   list.innerHTML = "";
   const personnes = loadPersonnes();
@@ -1814,7 +1843,13 @@ function renderPersonnesManageList() {
   personnes.forEach((p) => {
     const row = document.createElement("div");
     row.className = "personne-row";
-    row.innerHTML = `<span class="dot" style="background:${p.couleur}"></span><span class="nom">${escapeHtml(p.nom)}</span>`;
+    const details = [];
+    if (currentEspace() === "famille") {
+      if (p.age) details.push(`${p.age} ans`);
+      if (p.travaille) details.push("travaille");
+    }
+    const detailsHtml = details.length ? ` <span class="personne-details">(${details.join(" · ")})</span>` : "";
+    row.innerHTML = `<span class="dot" style="background:${p.couleur}"></span><span class="nom">${escapeHtml(p.nom)}${detailsHtml}</span>`;
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.className = "btn-danger";
@@ -1831,9 +1866,15 @@ function renderPersonnesManageList() {
   });
 }
 
-function addPersonne(nom, couleur) {
+function addPersonne(nom, couleur, age, travaille) {
   const personnes = loadPersonnes();
-  personnes.push({ id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8), nom, couleur });
+  personnes.push({
+    id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
+    nom,
+    couleur,
+    age: age || null,
+    travaille: !!travaille,
+  });
   savePersonnes(personnes);
 }
 
@@ -2612,15 +2653,7 @@ function renderEntrepriseMonth() {
       .filter((a) => a.date === iso)
       .map((a) => personnes.find((p) => p.id === a.personneId)?.couleur)
       .filter(Boolean);
-    if (colors.length === 1) {
-      cell.classList.add("filled");
-      cell.style.background = colors[0];
-    } else if (colors.length > 1) {
-      cell.classList.add("filled");
-      const step = 100 / colors.length;
-      const stops = colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(", ");
-      cell.style.background = `linear-gradient(135deg, ${stops})`;
-    }
+    applyPresenceFill(cell, colors);
 
     // Les activités ajoutées via "+ Ajouter une activité" (pas de vue Jour/Semaine en
     // Entreprise, donc toutes s'affichent ici, pas seulement les "importantes").
@@ -2834,9 +2867,13 @@ function initEvents() {
     e.preventDefault();
     const nom = document.getElementById("personneNom").value.trim();
     const couleur = document.getElementById("personneCouleur").value;
+    const age = document.getElementById("personneAge").value;
+    const travaille = document.getElementById("personneTravaille").checked;
     if (!nom) return;
-    addPersonne(nom, couleur);
+    addPersonne(nom, couleur, age, travaille);
     document.getElementById("personneNom").value = "";
+    document.getElementById("personneAge").value = "";
+    document.getElementById("personneTravaille").checked = false;
     renderPersonnesManageList();
     if (currentEspace() === "entreprise") renderEntrepriseView();
   });
@@ -3041,9 +3078,15 @@ function renderFamillePersonnesRow() {
 
   const list = document.getElementById("famillePersonnesList");
   list.innerHTML = "";
-  const personnes = loadPersonnes();
-  if (personnes.length === 0) {
+  const toutesPersonnes = loadPersonnes();
+  const personnes = toutesPersonnes.filter((p) => p.travaille);
+  if (toutesPersonnes.length === 0) {
     list.innerHTML = '<p class="import-explainer">Ajoute des personnes dans Menu → 👥 Personnes pour commencer.</p>';
+    return;
+  }
+  if (personnes.length === 0) {
+    list.innerHTML =
+      '<p class="import-explainer">Coche "Cette personne travaille" dans Menu → 👥 Personnes pour pouvoir colorer ses jours de travail.</p>';
     return;
   }
   personnes.forEach((p) => {
@@ -3125,15 +3168,7 @@ function renderMonthCalendar() {
         .filter((a) => a.date === iso)
         .map((a) => personnes.find((p) => p.id === a.personneId)?.couleur)
         .filter(Boolean);
-      if (colors.length === 1) {
-        cell.classList.add("filled");
-        cell.style.background = colors[0];
-      } else if (colors.length > 1) {
-        cell.classList.add("filled");
-        const step = 100 / colors.length;
-        const stops = colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(", ");
-        cell.style.background = `linear-gradient(135deg, ${stops})`;
-      }
+      applyPresenceFill(cell, colors);
     }
 
     const importantCourses = courses

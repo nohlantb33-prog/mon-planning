@@ -502,6 +502,11 @@ main {
   font-weight: 600;
   color: var(--text);
 }
+.personne-details {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
 
 .field-hint {
   display: block;
@@ -1314,14 +1319,11 @@ main {
 .month-cell.today .date-num { color: var(--primary); }
 .month-cell.outside .date-num { color: #C9C9D6; }
 
-/* Espace Entreprise : la case entière prend la couleur de la/des personne(s) présente(s) ce
-   jour-là (voir la légende à côté), sans texte écrit dessus. */
+/* Présence (Entreprise / Famille) : la case entière prend une teinte très légère de la
+   couleur de la/des personne(s) présente(s) ce jour-là (voir la légende à côté), sans texte
+   écrit dessus — volontairement discret pour ne pas dominer le calendrier. */
 .month-cell.filled { border-left-color: transparent; }
-.month-cell.filled .date-num {
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-}
-.month-cell.filled:hover { filter: brightness(0.94); }
+.month-cell.filled:hover { filter: brightness(0.97); }
 
 .chip {
   font-size: 0.68rem;
