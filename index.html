@@ -207,6 +207,12 @@
             <p class="import-explainer">
               Ajoute des habitudes à suivre chaque jour, puis coche les jours où tu les as tenues.
             </p>
+
+            <div class="habit-goal-row">
+              <label for="habitGoalInput">🎯 Objectif du jour</label>
+              <input type="text" id="habitGoalInput" placeholder="Écris ton objectif pour aujourd'hui...">
+            </div>
+
             <form id="habitAddForm" class="todo-add-form">
               <input type="text" id="habitNouvelleHabitude" placeholder="Nouvelle habitude (ex : Boire de l'eau 💧)">
               <button type="submit" class="btn-primary">Ajouter</button>
@@ -216,6 +222,11 @@
               <button type="button" id="prevHabitMonth" class="btn-ghost" aria-label="Mois précédent">←</button>
               <div id="habitMonthLabel" class="week-label">Ce mois</div>
               <button type="button" id="nextHabitMonth" class="btn-ghost" aria-label="Mois suivant">→</button>
+            </div>
+
+            <div class="habit-period-switch" id="habitPeriodSwitch">
+              <button type="button" class="habit-period-btn" data-period="semaine">Cette semaine</button>
+              <button type="button" class="habit-period-btn active" data-period="mois">Tout le mois</button>
             </div>
 
             <div id="habitSummary" class="habit-summary hidden"></div>

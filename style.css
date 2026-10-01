@@ -888,6 +888,52 @@ main {
 .habit-cell.today { box-shadow: inset 0 0 0 2px var(--primary); }
 .habit-cell.checked { background: var(--habit-color, var(--primary)); }
 
+.habit-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.habit-goal-row label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.habit-goal-row input {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.9rem;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.habit-period-switch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.habit-period-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.habit-period-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
 .habit-summary {
   display: flex;
   align-items: center;

@@ -10,6 +10,7 @@ const TODO_ITEMS_KEY = "monPlanningTodoItems";
 const TODO_LISTE_ACTUELLE_KEY = "monPlanningTodoListeActuelle";
 const HABITS_KEY = "monPlanningHabitudes";
 const HABIT_CHECKS_KEY = "monPlanningHabitudeChecks";
+const HABIT_GOALS_KEY = "monPlanningHabitudeObjectifs";
 
 const ESPACES = [
   { id: "solo", label: "Solo", emoji: "🙋" },
@@ -289,6 +290,36 @@ function loadHabitChecks() {
 
 function saveHabitChecks(checks) {
   localStorage.setItem(spaceKey(HABIT_CHECKS_KEY), JSON.stringify(checks));
+}
+
+function loadHabitGoals() {
+  try {
+    return JSON.parse(localStorage.getItem(spaceKey(HABIT_GOALS_KEY))) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHabitGoals(goals) {
+  localStorage.setItem(spaceKey(HABIT_GOALS_KEY), JSON.stringify(goals));
+}
+
+function getHabitGoal(listeId, dateISO) {
+  const goal = loadHabitGoals().find((g) => g.listeId === listeId && g.date === dateISO);
+  return goal ? goal.texte : "";
+}
+
+function setHabitGoal(listeId, dateISO, texte) {
+  const goals = loadHabitGoals();
+  const idx = goals.findIndex((g) => g.listeId === listeId && g.date === dateISO);
+  if (!texte.trim()) {
+    if (idx >= 0) goals.splice(idx, 1);
+  } else if (idx >= 0) {
+    goals[idx].texte = texte;
+  } else {
+    goals.push({ listeId, date: dateISO, texte });
+  }
+  saveHabitGoals(goals);
 }
 
 function loadAssignations() {
@@ -1890,6 +1921,7 @@ function deleteTodoListe(id) {
     .map((h) => h.id);
   saveHabits(loadHabits().filter((h) => h.listeId !== id));
   saveHabitChecks(loadHabitChecks().filter((c) => !habitIds.includes(c.habitId)));
+  saveHabitGoals(loadHabitGoals().filter((g) => g.listeId !== id));
   if (loadCurrentTodoListeId() === id) saveCurrentTodoListeId(null);
 }
 
@@ -2011,6 +2043,30 @@ function switchTodoView(mode) {
 // --- Habitudes : listes To-do de type "habitudes", avec grille jour x habitude, % et série ---
 
 let habitReferenceDate = new Date();
+let habitStatsPeriod = "mois"; // "mois" ou "semaine" — ne change que les statistiques, pas la grille
+
+// Dates (ISO) sur lesquelles calculer les statistiques : soit les jours du mois affiché,
+// soit les 7 jours de la semaine en cours (réelle, indépendante du mois affiché).
+function habitStatsDatesISO() {
+  if (habitStatsPeriod === "semaine") {
+    const monday = getMonday(new Date());
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      dates.push(toISODate(d));
+    }
+    return dates;
+  }
+  const year = habitReferenceDate.getFullYear();
+  const month = habitReferenceDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const dates = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    dates.push(toISODate(new Date(year, month, d)));
+  }
+  return dates;
+}
 
 function addHabit(listeId, nom) {
   const habits = loadHabits();
@@ -2048,14 +2104,15 @@ function habitStreak(habitId, checks) {
   return streak;
 }
 
-// Vue d'ensemble du mois, toutes habitudes confondues : % global + tableau récap.
+// Vue d'ensemble (semaine ou mois selon le sélecteur), toutes habitudes confondues.
 function renderHabitSummary(totalChecked, totalPossible) {
   const el = document.getElementById("habitSummary");
   el.classList.remove("hidden");
   const pct = totalPossible ? Math.round((totalChecked / totalPossible) * 100) : 0;
   const incomplete = totalPossible - totalChecked;
+  const label = habitStatsPeriod === "semaine" ? "cette semaine" : "ce mois-ci";
   el.innerHTML = `
-    <div class="habit-summary-pct"><strong>${pct}%</strong><span>ce mois-ci</span></div>
+    <div class="habit-summary-pct"><strong>${pct}%</strong><span>${label}</span></div>
     <div class="habit-summary-stats">
       <div><strong>${totalChecked}</strong><span>Complété</span></div>
       <div><strong>${incomplete}</strong><span>Incomplet</span></div>
@@ -2070,6 +2127,8 @@ function renderHabitGrid() {
   const habits = loadHabits().filter((h) => h.listeId === listeId);
   const checks = loadHabitChecks();
   const today = new Date();
+
+  document.getElementById("habitGoalInput").value = getHabitGoal(listeId, toISODate(today));
 
   const year = habitReferenceDate.getFullYear();
   const month = habitReferenceDate.getMonth();
@@ -2101,17 +2160,17 @@ function renderHabitGrid() {
     grid.appendChild(head);
   }
 
-  const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const statsDates = habitStatsDatesISO();
 
-  const totalPossible = habits.length * daysInMonth;
+  const totalPossible = habits.length * statsDates.length;
   const totalChecked = checks.filter(
-    (c) => c.date.startsWith(monthPrefix) && habits.some((h) => h.id === c.habitId)
+    (c) => statsDates.includes(c.date) && habits.some((h) => h.id === c.habitId)
   ).length;
   renderHabitSummary(totalChecked, totalPossible);
 
   habits.forEach((h) => {
-    const totalChecked = checks.filter((c) => c.habitId === h.id && c.date.startsWith(monthPrefix)).length;
-    const pct = Math.round((totalChecked / daysInMonth) * 100);
+    const habitChecked = checks.filter((c) => c.habitId === h.id && statsDates.includes(c.date)).length;
+    const pct = Math.round((habitChecked / statsDates.length) * 100);
     const streak = habitStreak(h.id, checks);
 
     const nameCell = document.createElement("div");
@@ -2567,6 +2626,20 @@ function initEvents() {
   document.getElementById("nextHabitMonth").addEventListener("click", () => {
     habitReferenceDate.setMonth(habitReferenceDate.getMonth() + 1);
     renderHabitGrid();
+  });
+  document.querySelectorAll("#habitPeriodSwitch .habit-period-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      habitStatsPeriod = btn.dataset.period;
+      document
+        .querySelectorAll("#habitPeriodSwitch .habit-period-btn")
+        .forEach((b) => b.classList.toggle("active", b === btn));
+      renderHabitGrid();
+    });
+  });
+  document.getElementById("habitGoalInput").addEventListener("input", (e) => {
+    const listeId = currentTodoListeId();
+    if (!listeId) return;
+    setHabitGoal(listeId, toISODate(new Date()), e.target.value);
   });
 
   document.getElementById("menuBtn").addEventListener("click", () => openMenuModal());
