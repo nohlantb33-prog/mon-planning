@@ -11,6 +11,8 @@ const TODO_LISTE_ACTUELLE_KEY = "monPlanningTodoListeActuelle";
 const HABITS_KEY = "monPlanningHabitudes";
 const HABIT_CHECKS_KEY = "monPlanningHabitudeChecks";
 const HABIT_DAYTASKS_KEY = "monPlanningHabitudeTaches";
+const MONTHLY_HABITS_KEY = "monPlanningHabitudesMensuelles";
+const MONTHLY_HABIT_CHECKS_KEY = "monPlanningHabitudesMensuellesChecks";
 
 const ESPACES = [
   { id: "solo", label: "Solo", emoji: "🙋" },
@@ -1939,6 +1941,11 @@ function deleteTodoListe(id) {
     .map((h) => h.id);
   saveHabits(loadHabits().filter((h) => h.listeId !== id));
   saveHabitChecks(loadHabitChecks().filter((c) => !habitIds.includes(c.habitId)));
+  const monthlyHabitIds = loadMonthlyHabits()
+    .filter((h) => h.listeId === id)
+    .map((h) => h.id);
+  saveMonthlyHabits(loadMonthlyHabits().filter((h) => h.listeId !== id));
+  saveMonthlyHabitChecks(loadMonthlyHabitChecks().filter((c) => !monthlyHabitIds.includes(c.habitId)));
   if (loadCurrentTodoListeId() === id) saveCurrentTodoListeId(null);
 }
 
@@ -2132,6 +2139,119 @@ function toggleHabitCheck(habitId, dateISO) {
   saveHabitChecks(checks);
 }
 
+// --- Habitudes mensuelles : cochées une seule fois par mois (ex : "Faire le budget"), plutôt
+// que chaque jour comme les habitudes de la grille. Suivent le même mois affiché (navigation
+// précédent/suivant partagée avec la grille quotidienne). ---
+
+function loadMonthlyHabits() {
+  try {
+    return JSON.parse(localStorage.getItem(spaceKey(MONTHLY_HABITS_KEY))) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMonthlyHabits(habits) {
+  localStorage.setItem(spaceKey(MONTHLY_HABITS_KEY), JSON.stringify(habits));
+}
+
+function loadMonthlyHabitChecks() {
+  try {
+    return JSON.parse(localStorage.getItem(spaceKey(MONTHLY_HABIT_CHECKS_KEY))) || [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMonthlyHabitChecks(checks) {
+  localStorage.setItem(spaceKey(MONTHLY_HABIT_CHECKS_KEY), JSON.stringify(checks));
+}
+
+function monthStrOf(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function addMonthlyHabit(listeId, nom) {
+  const habits = loadMonthlyHabits();
+  const usedColors = new Set(habits.filter((h) => h.listeId === listeId).map((h) => h.couleur));
+  const swatchColors = Array.from(document.querySelectorAll("#colorPicker .swatch")).map((s) => s.dataset.color);
+  const couleur = swatchColors.find((c) => !usedColors.has(c)) || swatchColors[0];
+  habits.push({ id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8), listeId, nom, couleur });
+  saveMonthlyHabits(habits);
+}
+
+function deleteMonthlyHabit(id) {
+  saveMonthlyHabits(loadMonthlyHabits().filter((h) => h.id !== id));
+  saveMonthlyHabitChecks(loadMonthlyHabitChecks().filter((c) => c.habitId !== id));
+}
+
+function toggleMonthlyHabitCheck(habitId, monthStr) {
+  const checks = loadMonthlyHabitChecks();
+  const idx = checks.findIndex((c) => c.habitId === habitId && c.month === monthStr);
+  if (idx >= 0) {
+    checks.splice(idx, 1);
+  } else {
+    checks.push({ habitId, month: monthStr });
+  }
+  saveMonthlyHabitChecks(checks);
+}
+
+// Nombre de mois d'affilée (en remontant à partir du mois réel actuel) où l'habitude a été cochée.
+function monthlyHabitStreak(habitId, checks) {
+  let streak = 0;
+  const d = new Date();
+  d.setDate(1);
+  while (checks.some((c) => c.habitId === habitId && c.month === monthStrOf(d))) {
+    streak++;
+    d.setMonth(d.getMonth() - 1);
+  }
+  return streak;
+}
+
+function renderMonthlyHabits() {
+  const listeId = currentTodoListeId();
+  const monthStr = monthStrOf(habitReferenceDate);
+  const habits = loadMonthlyHabits().filter((h) => h.listeId === listeId);
+  const checks = loadMonthlyHabitChecks();
+  const list = document.getElementById("monthlyHabitList");
+  list.innerHTML = "";
+  if (habits.length === 0) {
+    list.innerHTML = '<p class="import-explainer">Ajoute une habitude mensuelle ci-dessus pour commencer.</p>';
+    return;
+  }
+  habits.forEach((h) => {
+    const checked = checks.some((c) => c.habitId === h.id && c.month === monthStr);
+    const streak = monthlyHabitStreak(h.id, checks);
+
+    const row = document.createElement("div");
+    row.className = "todo-item" + (checked ? " done" : "");
+
+    const main = document.createElement("button");
+    main.type = "button";
+    main.className = "todo-item-main";
+    const checkStyle = checked ? ` style="background:${h.couleur};border-color:${h.couleur}"` : "";
+    main.innerHTML = `<span class="todo-check"${checkStyle}>${checked ? "✓" : ""}</span><span class="todo-texte">${escapeHtml(h.nom)}</span><span class="habit-pct">${streak > 0 ? "🔥 " + streak + " mois" : ""}</span>`;
+    main.addEventListener("click", () => {
+      toggleMonthlyHabitCheck(h.id, monthStr);
+      renderMonthlyHabits();
+    });
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "todo-delete";
+    delBtn.textContent = "✕";
+    delBtn.title = "Supprimer cette habitude mensuelle";
+    delBtn.addEventListener("click", () => {
+      if (!confirm(`Supprimer l'habitude mensuelle "${h.nom}" ?`)) return;
+      deleteMonthlyHabit(h.id);
+      renderMonthlyHabits();
+    });
+
+    row.append(main, delBtn);
+    list.appendChild(row);
+  });
+}
+
 // Tâches à préparer pour un jour précis (aujourd'hui ou demain) : pensées à l'avance, pour
 // n'avoir qu'à les exécuter le jour venu sans se demander quoi faire. Entrée fixe de la barre
 // latérale, indépendante des listes.
@@ -2301,6 +2421,8 @@ function renderHabitGrid() {
     month: "long",
     year: "numeric",
   });
+
+  renderMonthlyHabits();
 
   grid.innerHTML = "";
   if (habits.length === 0) {
@@ -2789,6 +2911,16 @@ function initEvents() {
     addHabit(listeId, nom);
     input.value = "";
     renderHabitGrid();
+  });
+  document.getElementById("monthlyHabitAddForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("monthlyHabitNouvelleHabitude");
+    const nom = input.value.trim();
+    const listeId = currentTodoListeId();
+    if (!nom || !listeId) return;
+    addMonthlyHabit(listeId, nom);
+    input.value = "";
+    renderMonthlyHabits();
   });
   document.getElementById("prevHabitMonth").addEventListener("click", () => {
     habitReferenceDate.setMonth(habitReferenceDate.getMonth() - 1);

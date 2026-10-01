@@ -264,6 +264,19 @@
             <div class="habit-grid-wrap">
               <div class="habit-grid" id="habitGrid"></div>
             </div>
+
+            <div class="habit-monthly-section">
+              <h3>📅 Habitudes mensuelles</h3>
+              <p class="import-explainer">
+                Des habitudes à cocher une seule fois par mois (ex : faire le budget), plutôt que
+                chaque jour comme ci-dessus. Suivent le mois affiché.
+              </p>
+              <form id="monthlyHabitAddForm" class="todo-add-form">
+                <input type="text" id="monthlyHabitNouvelleHabitude" placeholder="Nouvelle habitude mensuelle (ex : Faire le budget 💰)">
+                <button type="submit" class="btn-primary">Ajouter</button>
+              </form>
+              <div id="monthlyHabitList" class="todo-list"></div>
+            </div>
           </div>
         </div>
       </main>
