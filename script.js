@@ -2088,7 +2088,7 @@ function renderHabitGrid() {
   grid.style.display = "grid";
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  grid.style.gridTemplateColumns = `150px repeat(${daysInMonth}, 28px)`;
+  grid.style.gridTemplateColumns = `170px repeat(${daysInMonth}, minmax(32px, 1fr))`;
 
   const corner = document.createElement("div");
   corner.className = "habit-corner-cell";
