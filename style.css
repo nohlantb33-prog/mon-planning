@@ -502,6 +502,7 @@ main {
   font-weight: 600;
   color: var(--text);
 }
+.personne-travaille-hint { margin: -4px 0 12px 24px; }
 .personne-details {
   font-weight: 400;
   color: var(--muted);
