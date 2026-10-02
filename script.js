@@ -1843,12 +1843,8 @@ function renderPersonnesManageList() {
   personnes.forEach((p) => {
     const row = document.createElement("div");
     row.className = "personne-row";
-    const details = [];
-    if (currentEspace() === "famille") {
-      if (p.age) details.push(`${p.age} ans`);
-      if (p.travaille) details.push("travaille");
-    }
-    const detailsHtml = details.length ? ` <span class="personne-details">(${details.join(" · ")})</span>` : "";
+    const detailsHtml =
+      currentEspace() === "famille" && p.travaille ? ' <span class="personne-details">(travaille)</span>' : "";
     row.innerHTML = `<span class="dot" style="background:${p.couleur}"></span><span class="nom">${escapeHtml(p.nom)}${detailsHtml}</span>`;
     const delBtn = document.createElement("button");
     delBtn.type = "button";
@@ -1866,13 +1862,12 @@ function renderPersonnesManageList() {
   });
 }
 
-function addPersonne(nom, couleur, age, travaille) {
+function addPersonne(nom, couleur, travaille) {
   const personnes = loadPersonnes();
   personnes.push({
     id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
     nom,
     couleur,
-    age: age || null,
     travaille: !!travaille,
   });
   savePersonnes(personnes);
@@ -2867,12 +2862,10 @@ function initEvents() {
     e.preventDefault();
     const nom = document.getElementById("personneNom").value.trim();
     const couleur = document.getElementById("personneCouleur").value;
-    const age = document.getElementById("personneAge").value;
     const travaille = document.getElementById("personneTravaille").checked;
     if (!nom) return;
-    addPersonne(nom, couleur, age, travaille);
+    addPersonne(nom, couleur, travaille);
     document.getElementById("personneNom").value = "";
-    document.getElementById("personneAge").value = "";
     document.getElementById("personneTravaille").checked = false;
     renderPersonnesManageList();
     if (currentEspace() === "entreprise") renderEntrepriseView();
