@@ -1359,6 +1359,7 @@ function renderCalendar() {
       block.style.top = pixels.top + "px";
       block.style.height = Math.max(pixels.height, MIN_BLOCK_HEIGHT_WITH_TEXT) + "px";
       block.style.background = getCourseBackground(course);
+    block.style.color = getCourseTextColor(course);
       block.innerHTML = `<span class="titre">${escapeHtml(course.activite)}</span><span class="detail">${course.heureDebut}–${course.heureFin}${course.salle ? " · " + escapeHtml(course.salle) : ""}</span>`;
       block.title = compact ? `${course.activite} : ${course.heureDebut}–${course.heureFin} (bloc réduit)` : "";
       block.addEventListener("click", () => openModal(course));
@@ -1432,6 +1433,7 @@ function renderDayCalendar() {
     block.style.top = pixels.top + "px";
     block.style.height = Math.max(pixels.height, MIN_BLOCK_HEIGHT_WITH_TEXT) + "px";
     block.style.background = getCourseBackground(course);
+    block.style.color = getCourseTextColor(course);
     block.innerHTML = `<span class="titre">${escapeHtml(course.activite)}</span><span class="detail">${course.heureDebut}–${course.heureFin}${course.salle ? " · " + escapeHtml(course.salle) : ""}</span>`;
     block.title = compact ? `${course.activite} : ${course.heureDebut}–${course.heureFin} (bloc réduit)` : "";
     block.addEventListener("click", () => openModal(course));
@@ -1652,8 +1654,8 @@ function updateSwatchFromSelection() {
   if (couleur) selectSwatch(couleur);
 }
 
-// Couleur (ou dégradé si plusieurs personnes/animaux) à appliquer au fond d'un bloc d'activité.
-function getCourseBackground(course) {
+// Couleurs de fond d'une activité : plusieurs (personnes/animaux cochés, espace Famille) ou une seule.
+function getCourseColors(course) {
   if (currentEspace() === "famille") {
     const personneIds = coursePersonneIds(course);
     const animalIds = courseAnimalIds(course);
@@ -1664,14 +1666,39 @@ function getCourseBackground(course) {
         ...personneIds.map((id) => personnes.find((p) => p.id === id)?.couleur),
         ...animalIds.map((id) => animaux.find((a) => a.id === id)?.couleur),
       ].filter(Boolean);
-      if (colors.length > 1) {
-        const step = 100 / colors.length;
-        const stops = colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(", ");
-        return `linear-gradient(to right, ${stops})`;
-      }
+      if (colors.length > 1) return colors;
     }
   }
-  return course.couleur || "#6C63FF";
+  return [course.couleur || "#6C63FF"];
+}
+
+// Couleur (ou dégradé si plusieurs personnes/animaux) à appliquer au fond d'un bloc d'activité.
+function getCourseBackground(course) {
+  const colors = getCourseColors(course);
+  if (colors.length === 1) return colors[0];
+  const step = 100 / colors.length;
+  const stops = colors.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(", ");
+  return `linear-gradient(to right, ${stops})`;
+}
+
+// Texte sombre sur fond clair (ex : jaune), blanc sur fond foncé, pour rester lisible.
+function readableTextColor(colors) {
+  const luminances = colors.map((hex) => {
+    let h = hex.replace("#", "");
+    if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+    const num = parseInt(h, 16);
+    const [r, g, b] = [(num >> 16) & 255, (num >> 8) & 255, num & 255].map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  });
+  const avg = luminances.reduce((a, b) => a + b, 0) / luminances.length;
+  return avg > 0.4 ? "#22223B" : "#FFFFFF";
+}
+
+function getCourseTextColor(course) {
+  return readableTextColor(getCourseColors(course));
 }
 
 function updateTypeFieldsVisibility() {
@@ -2659,7 +2686,7 @@ function renderEntrepriseMonth() {
         const chip = document.createElement("div");
         chip.className = "chip" + (c.importance === "tres_important" ? " chip-tres-important" : "");
         chip.style.background = c.couleur || "#6C63FF";
-        chip.style.color = "white";
+        chip.style.color = getCourseTextColor(c);
         chip.textContent = `${c.heureDebut} ${c.activite}`;
         chip.title = c.activite;
         chip.addEventListener("click", (e) => {
@@ -3173,7 +3200,7 @@ function renderMonthCalendar() {
       const chip = document.createElement("div");
       chip.className = "chip" + (c.importance === "tres_important" ? " chip-tres-important" : "");
       chip.style.background = getCourseBackground(c);
-      chip.style.color = "white";
+      chip.style.color = getCourseTextColor(c);
       chip.textContent = `${c.heureDebut} ${c.activite}`;
       chip.title = c.activite;
       chip.addEventListener("click", (e) => {
