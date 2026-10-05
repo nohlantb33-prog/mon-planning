@@ -374,7 +374,7 @@ function hexToRgba(hex, alpha) {
 // discrète (légère teinte) pour ne pas dominer visuellement tout le calendrier.
 const PRESENCE_FILL_ALPHA = 0.16;
 
-function applyPresenceFill(cell, colors) {
+function applyPresenceFill(cell, colors, direction = "135deg") {
   if (colors.length === 0) return;
   cell.classList.add("filled");
   const pale = colors.map((c) => hexToRgba(c, PRESENCE_FILL_ALPHA));
@@ -383,7 +383,7 @@ function applyPresenceFill(cell, colors) {
   } else {
     const step = 100 / pale.length;
     const stops = pale.map((c, i) => `${c} ${i * step}%, ${c} ${(i + 1) * step}%`).join(", ");
-    cell.style.background = `linear-gradient(135deg, ${stops})`;
+    cell.style.background = `linear-gradient(${direction}, ${stops})`;
   }
 }
 
@@ -1304,16 +1304,25 @@ function renderCalendar() {
   const today = new Date();
   renderWeekLabel(monday);
 
+  const weekDates = JOURS.map((_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+
   calendar.appendChild(makeCell("calendar-header", ""));
   JOURS.forEach((jour, i) => {
-    const dayDate = new Date(monday);
-    dayDate.setDate(monday.getDate() + i);
+    const dayDate = weekDates[i];
     const header = makeCell(
       "calendar-header" + (isSameDay(dayDate, today) ? " today" : ""),
       `${jour}<br><small>${formatDateShort(dayDate)}</small>`
     );
     header.style.cursor = "pointer";
-    header.title = "Voir ce jour en détail";
+    const workers = famillePersonnesQuiTravaillent(dayDate);
+    applyPresenceFill(header, workers.map((p) => p.couleur), "to right");
+    header.title = workers.length
+      ? `Travaille : ${workers.map((p) => p.nom).join(", ")} — clic pour voir ce jour`
+      : "Voir ce jour en détail";
     header.addEventListener("click", () => {
       dayReferenceDate = new Date(dayDate);
       switchView("jour");
@@ -1359,17 +1368,31 @@ function renderCalendar() {
       block.style.top = pixels.top + "px";
       block.style.height = Math.max(pixels.height, MIN_BLOCK_HEIGHT_WITH_TEXT) + "px";
       block.style.background = getCourseBackground(course);
-    block.style.color = getCourseTextColor(course);
+      block.style.color = getCourseTextColor(course);
       block.innerHTML = `<span class="titre">${escapeHtml(course.activite)}</span><span class="detail">${course.heureDebut}–${course.heureFin}${course.salle ? " · " + escapeHtml(course.salle) : ""}</span>`;
       block.title = compact ? `${course.activite} : ${course.heureDebut}–${course.heureFin} (bloc réduit)` : "";
       block.addEventListener("click", () => openModal(course));
       col.appendChild(block);
     });
 
+    const workers = famillePersonnesQuiTravaillent(weekDates[i]);
+    applyPresenceFill(col, workers.map((p) => p.couleur), "to right");
+
     calendar.appendChild(col);
   }
 
   replayFadeIn(calendar);
+}
+
+// Espace Famille : personnes qui travaillent ce jour-là (jours colorés dans la vue Mois).
+function famillePersonnesQuiTravaillent(date) {
+  if (currentEspace() !== "famille") return [];
+  const iso = toISODate(date);
+  const personnes = loadPersonnes();
+  return loadAssignations()
+    .filter((a) => a.date === iso)
+    .map((a) => personnes.find((p) => p.id === a.personneId))
+    .filter(Boolean);
 }
 
 // Vue Jour : un seul jour, en large, avec les noms des activités affichés en clair.
