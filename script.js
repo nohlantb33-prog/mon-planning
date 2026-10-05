@@ -1410,13 +1410,17 @@ function renderDayCalendar() {
     month: "long",
   });
 
+  const workers = famillePersonnesQuiTravaillent(dayReferenceDate);
+  const workerColors = workers.map((p) => p.couleur);
+
   calendar.appendChild(makeCell("calendar-header", ""));
-  calendar.appendChild(
-    makeCell(
-      "calendar-header" + (isSameDay(dayReferenceDate, today) ? " today" : ""),
-      `${JOURS[weekdayIndex]}<br><small>${formatDateShort(dayReferenceDate)}</small>`
-    )
+  const header = makeCell(
+    "calendar-header" + (isSameDay(dayReferenceDate, today) ? " today" : ""),
+    `${JOURS[weekdayIndex]}<br><small>${formatDateShort(dayReferenceDate)}</small>`
   );
+  applyPresenceFill(header, workerColors, "to right");
+  if (workers.length) header.title = `Travaille : ${workers.map((p) => p.nom).join(", ")}`;
+  calendar.appendChild(header);
 
   const splitHours = loadSplitHours();
   const viewStartHour = VIEW_START_MIN / 60;
@@ -1427,6 +1431,7 @@ function renderDayCalendar() {
   const col = document.createElement("div");
   col.className = "day-col";
   col.style.height = CALENDAR_HEIGHT + "px";
+  applyPresenceFill(col, workerColors, "to right");
   decorateDayColumn(col, weekdayIndex, splitHours, viewStartHour, viewEndHour);
 
   // Les segments de ce jour, plus la fin d'une activité de la veille qui passe minuit.
