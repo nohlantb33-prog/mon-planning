@@ -95,6 +95,10 @@ const THEMES = [
   { id: "ardoise", label: "Ardoise", swatch: ["#E7E9EC", "#5B6EE1", "#2B2E33"] },
   { id: "sombre", label: "Sombre", swatch: ["#1A1A24", "#8B80FF", "#EAEAF2"] },
   { id: "ocean", label: "Océan", swatch: ["#0D1B2A", "#4FC3F7", "#E6F1FF"] },
+  { id: "foret", label: "Forêt", swatch: ["#0E1A14", "#2FAF6B", "#E4F5EA"] },
+  { id: "amethyste", label: "Améthyste", swatch: ["#1A1030", "#B15CF0", "#F0E8FF"] },
+  { id: "braise", label: "Braise", swatch: ["#1F1210", "#F06A3A", "#FFEDE6"] },
+  { id: "rose-nuit", label: "Rose nuit", swatch: ["#240F1E", "#EC4899", "#FFE8F3"] },
 ];
 
 let referenceDate = new Date();
