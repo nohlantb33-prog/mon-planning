@@ -2000,7 +2000,6 @@ const Q_STEPS = [
     options: OBJECTIFS.map((o) => [o.id, o.label]),
   },
   { id: "horaires", type: "hours", title: "Ta journée commence et finit vers quelle heure ?", sub: "Ton calendrier affichera ces heures-là." },
-  { id: "theme", type: "theme", title: "Choisis ton style", sub: "Tu pourras le changer quand tu veux (Menu → Thème)." },
   { id: "recap", type: "recap" },
 ];
 
@@ -2191,25 +2190,6 @@ function renderQuestionnaireStep() {
     };
     row.append(makeSelect("Début", "debut", 0, 23), makeSelect("Fin", "fin", 1, 24));
     container.appendChild(row);
-  } else if (step.type === "theme") {
-    const list = document.createElement("div");
-    list.className = "theme-list";
-    const current = qProfile.theme || loadTheme();
-    THEMES.forEach((theme) => {
-      const option = document.createElement("button");
-      option.type = "button";
-      option.className = "theme-option" + (theme.id === current ? " selected" : "");
-      option.innerHTML = `<span class="theme-swatch">${theme.swatch
-        .map((c) => `<span style="background:${c}"></span>`)
-        .join("")}</span><span>${escapeHtml(theme.label)}</span>`;
-      option.addEventListener("click", () => {
-        qProfile.theme = theme.id;
-        applyTheme(theme.id); // aperçu en direct
-        renderQuestionnaireStep();
-      });
-      list.appendChild(option);
-    });
-    container.appendChild(list);
   }
 }
 
@@ -2255,7 +2235,7 @@ function profileHabits(profile) {
 function renderQuestionnaireRecap(container) {
   const p = qProfile;
   const items = [];
-  items.push(`📅 Ton calendrier affichera de ${p.debut}h à ${p.fin}h.`);
+  items.push(`📅 Ton planning${qIsRedo ? " Solo" : ""} affichera de ${p.debut}h à ${p.fin}h (modifiable pour chaque planning dans Mon profil).`);
   if (p.zone && p.zone !== "aucune") items.push(`🏖️ Les vacances de la zone ${p.zone} seront grisées.`);
   if (p.semainesAB === "A" || p.semainesAB === "B") items.push(`🅰️🅱️ Semaines A/B réglées : cette semaine est une semaine ${p.semainesAB}.`);
   const { daily, monthly } = profileHabits(p);
@@ -2306,9 +2286,9 @@ function refreshCalendarViews() {
   if (!document.getElementById("appRoot").classList.contains("hidden")) applyEspaceUI();
 }
 
-// Heures affichées : les mêmes dans les 3 espaces (réglées depuis le profil uniquement).
-function applyProfileHours(debut, fin) {
-  ESPACES.forEach((e) => readSpaceValue(e.id, () => saveRange({ start: debut, end: fin })));
+// Heures affichées dans les plannings donnés (chacun garde les siennes : voir Menu → Mon profil).
+function applyProfileHours(debut, fin, espaces) {
+  espaces.forEach((e) => readSpaceValue(e, () => saveRange({ start: debut, end: fin })));
 }
 
 // Zone de vacances (Solo + Famille, l'Entreprise n'a pas de vacances scolaires).
@@ -2347,8 +2327,10 @@ function applyProfileHabits(profile, openDashboard) {
 
 function applyProfile(profile) {
   saveProfile(profile);
-  if (profile.theme) applyTheme(profile.theme);
-  applyProfileHours(profile.debut, profile.fin);
+  // Heures de la journée : la 1re fois dans le Solo et les autres plannings choisis ; ensuite
+  // seulement le Solo, pour ne pas écraser les heures réglées à part pour Famille / Entreprise.
+  const hoursEspaces = qIsRedo ? ["solo"] : ["solo", ...profile.pourQui.filter((e) => e !== "solo")];
+  applyProfileHours(profile.debut, profile.fin, hoursEspaces);
   if (profile.zone) applyProfileZone(profile.zone);
   applyProfileSemaine(profile.semainesAB);
   applyProfileHabits(profile, !qIsRedo);
@@ -2521,38 +2503,46 @@ function renderProfilPanel() {
 
   // -- Planning --
   section("📅 Planning");
-  const range = readSpaceValue("solo", () => loadRange());
-  const hours = document.createElement("div");
-  hours.className = "q-hours";
-  const startSel = document.createElement("select");
-  const endSel = document.createElement("select");
-  for (let h = 0; h <= 23; h++) startSel.appendChild(new Option(`${h}h`, h, false, h === range.start));
-  for (let h = 1; h <= 24; h++) endSel.appendChild(new Option(`${h}h`, h, false, h === range.end));
-  const onHours = (changed) => {
-    let debut = Number(startSel.value);
-    let fin = Number(endSel.value);
-    // La fin doit rester après le début : on corrige l'autre liste.
-    if (fin <= debut) {
-      if (changed === "debut") fin = Math.min(debut + 1, 24);
-      else debut = Math.max(fin - 1, 0);
-      startSel.value = debut;
-      endSel.value = fin;
-    }
-    Object.assign(profile, { debut, fin });
-    applyProfileHours(debut, fin);
-    save();
-    refreshCalendarViews();
-  };
-  startSel.addEventListener("change", () => onHours("debut"));
-  endSel.addEventListener("change", () => onHours("fin"));
-  const startLabel = document.createElement("label");
-  startLabel.textContent = "De";
-  startLabel.appendChild(startSel);
-  const endLabel = document.createElement("label");
-  endLabel.textContent = "À";
-  endLabel.appendChild(endSel);
-  hours.append(startLabel, endLabel);
-  field("Heures affichées dans le calendrier", hours, aide("Les mêmes dans les 3 espaces."));
+  // Heures affichées : un réglage par planning (Solo, Famille, Entreprise), indépendants.
+  const hoursBox = document.createElement("div");
+  hoursBox.className = "profil-hours";
+  ["solo", "famille", "entreprise"].forEach((espaceId) => {
+    const espace = ESPACES.find((e) => e.id === espaceId);
+    const range = readSpaceValue(espaceId, () => loadRange());
+    const row = document.createElement("div");
+    row.className = "profil-hours-row";
+    const name = document.createElement("span");
+    name.className = "profil-hours-name";
+    name.textContent = `${espace.emoji} ${espace.label}`;
+    const startSel = document.createElement("select");
+    const endSel = document.createElement("select");
+    startSel.setAttribute("aria-label", `Début (${espace.label})`);
+    endSel.setAttribute("aria-label", `Fin (${espace.label})`);
+    for (let h = 0; h <= 23; h++) startSel.appendChild(new Option(`${h}h`, h, false, h === range.start));
+    for (let h = 1; h <= 24; h++) endSel.appendChild(new Option(`${h}h`, h, false, h === range.end));
+    const onHours = (changed) => {
+      let debut = Number(startSel.value);
+      let fin = Number(endSel.value);
+      // La fin doit rester après le début : on corrige l'autre liste.
+      if (fin <= debut) {
+        if (changed === "debut") fin = Math.min(debut + 1, 24);
+        else debut = Math.max(fin - 1, 0);
+        startSel.value = debut;
+        endSel.value = fin;
+      }
+      applyProfileHours(debut, fin, [espaceId]);
+      flashProfilSaved();
+      refreshCalendarViews();
+    };
+    startSel.addEventListener("change", () => onHours("debut"));
+    endSel.addEventListener("change", () => onHours("fin"));
+    const to = document.createElement("span");
+    to.textContent = "à";
+    row.append(name, startSel, to, endSel);
+    hoursBox.appendChild(row);
+  });
+  field("Heures affichées dans le calendrier", hoursBox, aide("Chaque planning a ses propres heures."));
+
 
   field(
     "Je l'utilise pour…",
@@ -2568,14 +2558,6 @@ function renderProfilPanel() {
     }),
     aide("Cocher un objectif ajoute ses habitudes dans « 🎯 Mes objectifs ». Décocher ne les supprime pas.")
   );
-
-  const themeLabel = (THEMES.find((t) => t.id === loadTheme()) || THEMES[0]).label;
-  const themeBtn = document.createElement("button");
-  themeBtn.type = "button";
-  themeBtn.className = "btn-ghost profil-inline-btn";
-  themeBtn.textContent = `🎨 ${themeLabel} — changer`;
-  themeBtn.addEventListener("click", () => openMenuDetail("theme"));
-  field("Thème", themeBtn);
 
   // -- Refaire tout le questionnaire (facultatif) --
   const redo = document.createElement("button");

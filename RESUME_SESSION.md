@@ -8,7 +8,7 @@ Nohlan (lycéen) construit avec Claude Code un site de planning **100 % statique
 - **Site en ligne (Netlify, URL non référencée, protégée par connexion) :** https://splendorous-douhua-9e49e6.netlify.app — se redéploie automatiquement à chaque push sur `main`
 - **Installable comme une app** (PWA : manifest + service worker + icônes). Testé installé sur le téléphone de Nohlan.
 
-## ⚠️ État Git : des commits PAS ENCORE poussés (10 vraies nouveautés)
+## ⚠️ État Git : des commits PAS ENCORE poussés (11 vraies nouveautés)
 Les commits ci-dessous existent seulement sur le PC. Pour les mettre en ligne (et sur le téléphone), Nohlan lance **dans son propre terminal PowerShell** (l'outil de Claude n'a pas internet ni de TTY pour la connexion GitHub) :
 ```
 git push
@@ -23,7 +23,8 @@ Commits en attente (du plus ancien au plus récent) :
 7. `a147570` Le To-do suit aussi le thème choisi
 8. `0ffa4b6` Habitudes mensuelles visibles dans le Tableau de bord
 9. `4914e56` Questionnaire de personnalisation + suggestions « Pour toi »
-10. (ce commit) Page « Mon profil » modifiable, âge calculé depuis la naissance, heures déplacées dans le profil, bug du questionnaire bloqué corrigé
+10. `e7f2bba` Page « Mon profil » modifiable, âge calculé depuis la naissance, heures déplacées dans le profil, bug du questionnaire bloqué corrigé
+11. (ce commit) Heures propres à chaque planning dans Mon profil ; thème retiré du questionnaire et du profil
 ⚠️ Avant ce push : passer `CACHE_NAME` de `sw.js` à `mon-planning-v2` pour que les téléphones rechargent les fichiers.
 (+ quelques petits commits sans importance qui ne concernent que ce fichier RESUME_SESSION.md. Le nombre exact se voit avec `git log origin/main..HEAD --oneline` ; un seul `git push` envoie tout.)
 
@@ -62,11 +63,11 @@ Barre latérale : **📊 Tableau de bord**, **🎯 Tâches du jour**, puis les l
 Inspiré de 2 vidéos de "habit trackers" (tableur) que Nohlan avait fournies.
 
 ## Questionnaire de personnalisation + page « Mon profil » (2026-10-05)
-- Après l'écran prénom + e-mail (bouton « Continuer »), un questionnaire d'une question par écran, avec barre de progression : **mois + année de naissance** (l'âge se calcule tout seul, `ageFromNaissance()` / `describeAge()` → ex. « 17 ans · 18 ans en mai 2027 »), situation (collège/lycée/études/travail/recherche/autre), zone de vacances et semaines A/B (seulement pour les élèves/étudiants), pour qui (Moi / Famille / Entreprise), objectifs (10 choix), heures affichées (pré-remplies selon la situation), thème (aperçu en direct), puis un récapitulatif. Les choix uniques passent tout seuls à la question suivante (minuteur `qAdvanceTimer`, annulé si on navigue) ; le bouton devient « Passer » si on ne répond pas.
-- Validation (`applyProfile()`, découpée en `applyProfileHours` / `applyProfileZone` / `applyProfileSemaine` / `applyProfileHabits`) : heures dans les 3 espaces, zone + semaine A/B (Solo + Famille), thème, et une liste d'habitudes **« 🎯 Mes objectifs »** dans le To-do du Solo (habitudes quotidiennes et mensuelles selon `OBJECTIFS`, jamais en double). Démarre dans l'espace principal choisi.
+- Après l'écran prénom + e-mail (bouton « Continuer »), un questionnaire d'une question par écran, avec barre de progression : **mois + année de naissance** (l'âge se calcule tout seul, `ageFromNaissance()` / `describeAge()` → ex. « 17 ans · 18 ans en mai 2027 »), situation (collège/lycée/études/travail/recherche/autre), zone de vacances et semaines A/B (seulement pour les élèves/étudiants), pour qui (Moi / Famille / Entreprise), objectifs (10 choix), heures de la journée (pré-remplies selon la situation), puis un récapitulatif. **Pas de question sur le thème** (il y a déjà Menu → Thème). Les choix uniques passent tout seuls à la question suivante (minuteur `qAdvanceTimer`, annulé si on navigue) ; le bouton devient « Passer » si on ne répond pas.
+- Validation (`applyProfile()`, découpée en `applyProfileHours` / `applyProfileZone` / `applyProfileSemaine` / `applyProfileHabits`) : heures dans le Solo + les plannings choisis la 1re fois (seulement le Solo quand on refait le questionnaire, pour ne pas écraser les autres), zone + semaine A/B (Solo + Famille), et une liste d'habitudes **« 🎯 Mes objectifs »** dans le To-do du Solo (habitudes quotidiennes et mensuelles selon `OBJECTIFS`, jamais en double). Démarre dans l'espace principal choisi.
 - Réponses dans `monPlanningProfil` (clé globale, pas par espace) : objet unique prévu pour être envoyé tel quel dans Supabase plus tard. Les anciens profils avec une tranche d'âge (`age`) restent compris (`isUnder15()`) ; la tranche est supprimée dès qu'une date de naissance est indiquée.
-- **Menu → 👤 Mon profil** : page qui affiche toutes les réponses, **modifiables une par une** avec enregistrement immédiat (« ✓ Enregistré ») : prénom, e-mail, naissance, situation, zone, semaines A/B (affiche la vraie lettre de la semaine en cours), heures affichées, pour qui, objectifs (cocher = ajoute les habitudes ; décocher ne les supprime pas), thème (bouton vers Menu → Thème). Bouton **« 🔁 Refaire le questionnaire »** en bas.
-- Le réglage « Afficher de …h à …h » a été **retiré de l'écran principal** : les heures se règlent seulement dans Mon profil (les mêmes dans les 3 espaces).
+- **Menu → 👤 Mon profil** : page qui affiche toutes les réponses, **modifiables une par une** avec enregistrement immédiat (« ✓ Enregistré ») : prénom, e-mail, naissance, situation, zone, semaines A/B (affiche la vraie lettre de la semaine en cours), **heures affichées pour chaque planning séparément** (Solo, Famille, Entreprise), pour qui, objectifs (cocher = ajoute les habitudes ; décocher ne les supprime pas). Pas de réglage du thème ici (Menu → Thème suffit). Bouton **« 🔁 Refaire le questionnaire »** en bas.
+- Le réglage « Afficher de …h à …h » a été **retiré de l'écran principal** : les heures se règlent seulement dans Mon profil, chaque planning a les siennes (`applyProfileHours(debut, fin, espaces)`).
 - Tableau de bord : carte **« 💡 Pour toi »** (3 suggestions max, `dashboardSuggestions()`) : faire le questionnaire s'il n'a jamais été rempli, importer son emploi du temps (élève sans activités), ajouter les membres Famille/Entreprise, encouragement sur les habitudes des objectifs (série 🔥 ou « petit objectif du jour »).
 - Moins de 15 ans : message dans le récapitulatif (accord d'un parent nécessaire quand il y aura les comptes en ligne).
 - Bug corrigé : les boutons Suivant/Retour/✕ n'étaient branchés que lors de la toute première visite, donc le questionnaire relancé plus tard se bloquait à « Pour qui » (1re étape sans passage automatique).

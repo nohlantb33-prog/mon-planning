@@ -1669,3 +1669,22 @@ main {
   font-weight: 600;
   color: var(--text);
 }
+.profil-hours {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+.profil-hours-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+.profil-hours-name { font-weight: 600; }
+.modal .profil-hours-row select {
+  width: auto;
+  margin-top: 0;
+  padding: 6px 8px;
+}
