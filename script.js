@@ -382,6 +382,45 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+function parseHex(hex) {
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const num = parseInt(h, 16);
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+function mixHex(a, b, ratio) {
+  const ca = parseHex(a);
+  const cb = parseHex(b);
+  const out = ca.map((v, i) => Math.round(v * (1 - ratio) + cb[i] * ratio));
+  return "#" + out.map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+
+let themeAdaptCache = { theme: null, map: new Map() };
+
+// Nuance une couleur d'activité vers le thème actif (un peu de la couleur d'accent du thème, et
+// un fond légèrement assombri en thème sombre) pour éviter un gros décalage entre les couleurs
+// vives choisies et l'ambiance du thème. La couleur enregistrée n'est jamais modifiée.
+function themeAdaptColor(hex) {
+  if (!hex || !/^#[0-9a-f]{3,6}$/i.test(hex)) return hex;
+  const themeId = document.documentElement.getAttribute("data-theme") || "clair";
+  if (themeAdaptCache.theme !== themeId) themeAdaptCache = { theme: themeId, map: new Map() };
+  if (themeAdaptCache.map.has(hex)) return themeAdaptCache.map.get(hex);
+
+  const style = getComputedStyle(document.documentElement);
+  const primary = style.getPropertyValue("--primary").trim();
+  const bg = style.getPropertyValue("--bg").trim();
+  let result = hex;
+  if (/^#[0-9a-f]{6}$/i.test(primary) && /^#[0-9a-f]{6}$/i.test(bg)) {
+    const [r, g, b] = parseHex(bg).map((v) => v / 255);
+    const bgIsDark = 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.25;
+    result = mixHex(hex, primary, bgIsDark ? 0.15 : 0.1);
+    if (bgIsDark) result = mixHex(result, bg, 0.2);
+  }
+  themeAdaptCache.map.set(hex, result);
+  return result;
+}
+
 // Couleur(s) de présence (Entreprise / Famille) appliquée en fond de case, volontairement très
 // discrète (légère teinte) pour ne pas dominer visuellement tout le calendrier.
 const PRESENCE_FILL_ALPHA = 0.16;
@@ -389,7 +428,7 @@ const PRESENCE_FILL_ALPHA = 0.16;
 function applyPresenceFill(cell, colors, direction = "135deg") {
   if (colors.length === 0) return;
   cell.classList.add("filled");
-  const pale = colors.map((c) => hexToRgba(c, PRESENCE_FILL_ALPHA));
+  const pale = colors.map((c) => hexToRgba(themeAdaptColor(c), PRESENCE_FILL_ALPHA));
   if (pale.length === 1) {
     cell.style.background = pale[0];
   } else {
@@ -1100,6 +1139,8 @@ function applyTheme(themeId) {
   } else {
     document.documentElement.setAttribute("data-theme", themeId);
   }
+  // Les couleurs des activités s'adaptent au thème : on redessine la vue affichée.
+  if (!document.getElementById("appRoot").classList.contains("hidden")) switchView(currentView);
 }
 
 function renderThemeList() {
@@ -1706,10 +1747,10 @@ function getCourseColors(course) {
         ...personneIds.map((id) => personnes.find((p) => p.id === id)?.couleur),
         ...animalIds.map((id) => animaux.find((a) => a.id === id)?.couleur),
       ].filter(Boolean);
-      if (colors.length > 1) return colors;
+      if (colors.length > 1) return colors.map(themeAdaptColor);
     }
   }
-  return [course.couleur || "#6C63FF"];
+  return [themeAdaptColor(course.couleur || "#6C63FF")];
 }
 
 // Couleur (ou dégradé si plusieurs personnes/animaux) à appliquer au fond d'un bloc d'activité.
@@ -1734,7 +1775,7 @@ function readableTextColor(colors) {
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   });
   const avg = luminances.reduce((a, b) => a + b, 0) / luminances.length;
-  return avg > 0.4 ? "#22223B" : "#FFFFFF";
+  return avg > 0.25 ? "#22223B" : "#FFFFFF";
 }
 
 function getCourseTextColor(course) {
@@ -2565,7 +2606,7 @@ function renderHabitGrid() {
 
     const nameCell = document.createElement("div");
     nameCell.className = "habit-name-cell";
-    nameCell.innerHTML = `<span class="dot" style="background:${h.couleur}"></span><span class="nom">${escapeHtml(h.nom)}</span><span class="habit-pct">${pct}%${streak > 0 ? " · 🔥" + streak : ""}</span>`;
+    nameCell.innerHTML = `<span class="dot" style="background:${themeAdaptColor(h.couleur)}"></span><span class="nom">${escapeHtml(h.nom)}</span><span class="habit-pct">${pct}%${streak > 0 ? " · 🔥" + streak : ""}</span>`;
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.className = "habit-delete";
@@ -2586,7 +2627,7 @@ function renderHabitGrid() {
       const cell = document.createElement("button");
       cell.type = "button";
       cell.className = "habit-cell" + (checked ? " checked" : "") + (isSameDay(cellDate, today) ? " today" : "");
-      cell.style.setProperty("--habit-color", h.couleur);
+      cell.style.setProperty("--habit-color", themeAdaptColor(h.couleur));
       cell.title = `${h.nom} — ${cellDate.toLocaleDateString("fr-FR")}`;
       cell.addEventListener("click", () => {
         toggleHabitCheck(h.id, iso);
@@ -2725,7 +2766,7 @@ function renderEntrepriseMonth() {
       .forEach((c) => {
         const chip = document.createElement("div");
         chip.className = "chip" + (c.importance === "tres_important" ? " chip-tres-important" : "");
-        chip.style.background = c.couleur || "#6C63FF";
+        chip.style.background = getCourseBackground(c);
         chip.style.color = getCourseTextColor(c);
         chip.textContent = `${c.heureDebut} ${c.activite}`;
         chip.title = c.activite;
