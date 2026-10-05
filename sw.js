@@ -1,6 +1,6 @@
 // Numéro de version du cache : à changer (v2, v3, ...) à chaque mise à jour importante du site
 // pour forcer les téléphones/PC à retélécharger les nouveaux fichiers.
-const CACHE_NAME = "mon-planning-v1";
+const CACHE_NAME = "mon-planning-v2";
 
 const APP_SHELL = [
   "./",

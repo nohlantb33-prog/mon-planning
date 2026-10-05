@@ -25,7 +25,7 @@ Commits en attente (du plus ancien au plus récent) :
 9. `4914e56` Questionnaire de personnalisation + suggestions « Pour toi »
 10. `e7f2bba` Page « Mon profil » modifiable, âge calculé depuis la naissance, heures déplacées dans le profil, bug du questionnaire bloqué corrigé
 11. (ce commit) Heures propres à chaque planning dans Mon profil ; thème retiré du questionnaire et du profil
-⚠️ Avant ce push : passer `CACHE_NAME` de `sw.js` à `mon-planning-v2` pour que les téléphones rechargent les fichiers.
+`CACHE_NAME` passé à `mon-planning-v2` juste avant ce push (prochaine grosse mise à jour : v3).
 (+ quelques petits commits sans importance qui ne concernent que ce fichier RESUME_SESSION.md. Le nombre exact se voit avec `git log origin/main..HEAD --oneline` ; un seul `git push` envoie tout.)
 
 Identité Git configurée en local : Nohlan / nohlantb33@gmail.com. Pour voir ce qui reste à pousser : `git log origin/main..HEAD --oneline`.
