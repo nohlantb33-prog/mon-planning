@@ -25,18 +25,30 @@
 <body>
   <div id="onboardingOverlay" class="onboarding-overlay">
     <div class="onboarding-card">
-      <div class="onboarding-emoji">🗓️</div>
-      <h1>Bienvenue sur Mon Planning</h1>
-      <p>Dis-nous qui tu es pour personnaliser ton espace.</p>
-      <form id="onboardingForm">
-        <label>Prénom
-          <input type="text" id="onboardingPrenom" required placeholder="Ton prénom">
-        </label>
-        <label>Adresse mail
-          <input type="email" id="onboardingEmail" required placeholder="toi@exemple.com">
-        </label>
-        <button type="submit" class="btn-primary">Accéder à mon planning</button>
-      </form>
+      <div id="onboardingWelcome">
+        <div class="onboarding-emoji">🗓️</div>
+        <h1>Bienvenue sur Mon Planning</h1>
+        <p>Dis-nous qui tu es pour personnaliser ton espace.</p>
+        <form id="onboardingForm">
+          <label>Prénom
+            <input type="text" id="onboardingPrenom" required placeholder="Ton prénom">
+          </label>
+          <label>Adresse mail
+            <input type="email" id="onboardingEmail" required placeholder="toi@exemple.com">
+          </label>
+          <button type="submit" class="btn-primary">Continuer</button>
+        </form>
+      </div>
+
+      <div id="questionnaire" class="hidden">
+        <button type="button" id="qCloseBtn" class="q-close hidden" aria-label="Fermer">✕</button>
+        <div class="q-progress"><div id="qProgressBar" class="q-progress-bar"></div></div>
+        <div id="qStep" class="q-step"></div>
+        <div class="q-nav">
+          <button type="button" id="qBackBtn" class="btn-ghost">← Retour</button>
+          <button type="button" id="qNextBtn" class="btn-primary">Suivant</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -184,6 +196,11 @@
       <main class="todo-main">
         <div id="todoContent">
           <div id="todoDashboardContent" class="hidden">
+            <section id="dashboardSuggestionsSection" class="dashboard-section hidden">
+              <h3>💡 Pour toi</h3>
+              <div id="dashboardSuggestions" class="dashboard-suggestions"></div>
+            </section>
+
             <section class="dashboard-section">
               <h3>🎯 Aujourd'hui</h3>
               <div id="dashboardDayTasks" class="todo-list"></div>

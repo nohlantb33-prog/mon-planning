@@ -1168,6 +1168,7 @@ function renderThemeList() {
 // Pour ajouter une section : un objet {id, label, panelId, render} ici, plus le
 // <div id="panelId">...</div> correspondant dans index.html.
 const MENU_TABS = [
+  { id: "profil", label: "👤 Mon profil", action: () => { closeMenuModal(); openQuestionnaire(true); } },
   { id: "theme", label: "🎨 Thème", panelId: "menuTabTheme", render: renderThemeList },
   { id: "tips", label: "💡 Astuces", panelId: "menuTabTips", render: renderTipsList },
   { id: "print", label: "🖨️ Imprimer", action: () => { closeMenuModal(); window.print(); } },
@@ -1857,8 +1858,419 @@ function initOnboarding() {
     if (!prenom || !email) return;
     const user = { prenom, email };
     saveUser(user);
-    showApp(user);
+    openQuestionnaire(false);
   });
+
+  document.getElementById("qBackBtn").addEventListener("click", questionnaireBack);
+  document.getElementById("qNextBtn").addEventListener("click", questionnaireNext);
+  document.getElementById("qCloseBtn").addEventListener("click", closeQuestionnaire);
+}
+
+// --- Questionnaire de personnalisation (après le prénom, ou plus tard via Menu → Mon profil) ---
+// Les réponses sont gardées dans un seul objet "profil" (sur cet appareil seulement), qu'on
+// pourra plus tard envoyer tel quel dans un vrai compte. Elles servent à préparer le planning
+// (plage horaire, vacances, semaines A/B, habitudes) et aux suggestions du Tableau de bord.
+
+const PROFILE_KEY = "monPlanningProfil";
+
+const STUDENT_SITUATIONS = ["college", "lycee", "etudes"];
+
+// Chaque objectif crée une habitude quotidienne (habit) et/ou mensuelle (monthly).
+const OBJECTIFS = [
+  { id: "organiser", label: "📝 Mieux m'organiser", habit: "Préparer ma journée de demain 📝" },
+  { id: "reviser", label: "📖 Réviser / apprendre", habit: "Réviser 20 min 📖" },
+  { id: "sommeil", label: "😴 Mieux dormir", habit: "Au lit avant 23h 😴" },
+  { id: "sport", label: "🏃 Faire du sport", habit: "Bouger 30 min 🏃" },
+  { id: "lecture", label: "📚 Lire plus", habit: "Lire 10 pages 📚" },
+  { id: "ecran", label: "📵 Moins d'écran", habit: "Pas d'écran 1h avant de dormir 📵" },
+  { id: "eau", label: "💧 Boire plus d'eau", habit: "Boire 1,5 L d'eau 💧" },
+  { id: "detente", label: "🧘 Me détendre", habit: "5 min de calme 🧘" },
+  { id: "budget", label: "💰 Gérer mon budget", monthly: "Faire le point sur mon budget 💰" },
+  { id: "rangement", label: "🧹 Garder un espace rangé", habit: "Ranger 10 min 🧹", monthly: "Grand rangement du mois 🧹" },
+];
+
+const OBJECTIFS_LISTE_NOM = "🎯 Mes objectifs";
+
+// Plage horaire proposée par défaut selon la situation (modifiable à l'étape "horaires").
+function defaultHoursFor(situation) {
+  if (situation === "college" || situation === "lycee") return { debut: 7, fin: 19 };
+  if (situation === "etudes") return { debut: 8, fin: 20 };
+  if (situation === "travail") return { debut: 7, fin: 20 };
+  return { debut: 8, fin: 21 };
+}
+
+// Les étapes : "when" (optionnel) masque l'étape si elle ne concerne pas la personne.
+const Q_STEPS = [
+  {
+    id: "age",
+    type: "single",
+    title: "Quel âge as-tu ?",
+    sub: "Juste une tranche, pour adapter ce que je te propose.",
+    options: [
+      ["moins15", "Moins de 15 ans"],
+      ["15-17", "15 – 17 ans"],
+      ["18-25", "18 – 25 ans"],
+      ["26-40", "26 – 40 ans"],
+      ["41-60", "41 – 60 ans"],
+      ["plus60", "Plus de 60 ans"],
+    ],
+  },
+  {
+    id: "situation",
+    type: "single",
+    title: "Qu'est-ce que tu fais en ce moment ?",
+    options: [
+      ["college", "🎒 Collège"],
+      ["lycee", "📚 Lycée"],
+      ["etudes", "🎓 Études supérieures"],
+      ["travail", "💼 Je travaille"],
+      ["recherche", "🔎 Je cherche un emploi"],
+      ["autre", "✨ Autre"],
+    ],
+  },
+  {
+    id: "zone",
+    type: "single",
+    when: (p) => p.situation === "college" || p.situation === "lycee",
+    title: "Ta zone de vacances scolaires ?",
+    sub: "Les vacances seront grisées dans ton planning.",
+    options: [
+      ["A", "Zone A"],
+      ["B", "Zone B"],
+      ["C", "Zone C"],
+      ["aucune", "Je ne sais pas"],
+    ],
+  },
+  {
+    id: "semainesAB",
+    type: "single",
+    when: (p) => STUDENT_SITUATIONS.includes(p.situation),
+    title: "Ton emploi du temps change entre semaine A et semaine B ?",
+    options: [
+      ["A", "Oui, et cette semaine c'est une semaine A"],
+      ["B", "Oui, et cette semaine c'est une semaine B"],
+      ["non", "Non / je ne sais pas"],
+    ],
+  },
+  {
+    id: "pourQui",
+    type: "multi",
+    title: "Tu vas utiliser Mon Planning pour…",
+    sub: "Plusieurs choix possibles.",
+    options: [
+      ["solo", "🙋 Moi"],
+      ["famille", "👨‍👩‍👧 Ma famille"],
+      ["entreprise", "🏢 Mon équipe / mon entreprise"],
+    ],
+  },
+  {
+    id: "objectifs",
+    type: "multi",
+    title: "Quels sont tes objectifs ?",
+    sub: "Je te crée des habitudes pour t'aider. Plusieurs choix possibles.",
+    options: OBJECTIFS.map((o) => [o.id, o.label]),
+  },
+  { id: "horaires", type: "hours", title: "Ta journée commence et finit vers quelle heure ?", sub: "Ton calendrier affichera ces heures-là." },
+  { id: "theme", type: "theme", title: "Choisis ton style", sub: "Tu pourras le changer quand tu veux (Menu → Thème)." },
+  { id: "recap", type: "recap" },
+];
+
+let qProfile = null;
+let qStepIndex = 0;
+let qIsRedo = false;
+
+function loadProfile() {
+  try {
+    return JSON.parse(localStorage.getItem(PROFILE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function saveProfile(profile) {
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+}
+
+function visibleQSteps() {
+  return Q_STEPS.filter((s) => !s.when || s.when(qProfile));
+}
+
+// redo = true quand on le refait depuis le Menu (réponses précédentes pré-remplies, fermable).
+function openQuestionnaire(redo) {
+  qIsRedo = redo;
+  const saved = loadProfile();
+  qProfile = saved
+    ? { ...saved, pourQui: [...(saved.pourQui || [])], objectifs: [...(saved.objectifs || [])] }
+    : { pourQui: [], objectifs: [] };
+  // Si une plage horaire a déjà été réglée à la main, on la propose plutôt que celle par défaut.
+  const range = readSpaceValue("solo", () => loadRange());
+  if (qProfile.debut === undefined && !(range.start === 0 && range.end === 24)) {
+    Object.assign(qProfile, { debut: range.start, fin: range.end, hoursTouched: true });
+  }
+  qStepIndex = 0;
+  document.getElementById("onboardingWelcome").classList.add("hidden");
+  document.getElementById("questionnaire").classList.remove("hidden");
+  document.getElementById("qCloseBtn").classList.toggle("hidden", !redo);
+  document.querySelector(".onboarding-card").classList.add("wide");
+  document.getElementById("onboardingOverlay").classList.remove("hidden");
+  renderQuestionnaireStep();
+}
+
+function closeQuestionnaire() {
+  document.getElementById("onboardingOverlay").classList.add("hidden");
+}
+
+function questionnaireBack() {
+  if (qStepIndex === 0) {
+    if (qIsRedo) {
+      closeQuestionnaire();
+    } else {
+      document.getElementById("questionnaire").classList.add("hidden");
+      document.getElementById("onboardingWelcome").classList.remove("hidden");
+      document.querySelector(".onboarding-card").classList.remove("wide");
+    }
+    return;
+  }
+  qStepIndex--;
+  renderQuestionnaireStep();
+}
+
+function questionnaireNext() {
+  const steps = visibleQSteps();
+  if (steps[qStepIndex].type === "recap") {
+    finishQuestionnaire();
+    return;
+  }
+  qStepIndex = Math.min(qStepIndex + 1, steps.length - 1);
+  renderQuestionnaireStep();
+}
+
+function isQStepAnswered(step) {
+  const v = qProfile[step.id];
+  if (step.type === "multi") return v && v.length > 0;
+  if (step.type === "single") return !!v;
+  return true;
+}
+
+function renderQuestionnaireStep() {
+  const steps = visibleQSteps();
+  const step = steps[qStepIndex];
+  const container = document.getElementById("qStep");
+  document.getElementById("qProgressBar").style.width = `${Math.round(((qStepIndex + 1) / steps.length) * 100)}%`;
+  document.getElementById("qBackBtn").textContent = qStepIndex === 0 && qIsRedo ? "Fermer" : "← Retour";
+
+  const nextBtn = document.getElementById("qNextBtn");
+  if (step.type === "recap") {
+    nextBtn.textContent = qIsRedo ? "Enregistrer ✓" : "C'est parti ! 🚀";
+  } else {
+    nextBtn.textContent = isQStepAnswered(step) ? "Suivant" : "Passer";
+  }
+
+  container.innerHTML = "";
+  const title = document.createElement("h2");
+  title.className = "q-title";
+  container.appendChild(title);
+
+  if (step.type === "recap") {
+    const prenom = (loadUser() || {}).prenom;
+    title.textContent = prenom ? `C'est prêt, ${prenom} !` : "C'est prêt !";
+    renderQuestionnaireRecap(container);
+    return;
+  }
+
+  title.textContent = step.title;
+  if (step.sub) {
+    const sub = document.createElement("p");
+    sub.className = "q-sub";
+    sub.textContent = step.sub;
+    container.appendChild(sub);
+  }
+
+  if (step.type === "single" || step.type === "multi") {
+    const options = document.createElement("div");
+    options.className = "q-options" + (step.options.length > 4 ? " two-cols" : "");
+    step.options.forEach(([value, label]) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const selected = step.type === "multi" ? qProfile[step.id].includes(value) : qProfile[step.id] === value;
+      btn.className = "q-option" + (selected ? " selected" : "");
+      btn.textContent = label;
+      btn.addEventListener("click", () => {
+        if (step.type === "multi") {
+          const list = qProfile[step.id];
+          const idx = list.indexOf(value);
+          if (idx >= 0) list.splice(idx, 1);
+          else list.push(value);
+          renderQuestionnaireStep();
+        } else {
+          qProfile[step.id] = value;
+          // Choix unique : on passe tout seul à la question suivante.
+          if (step.id === "situation" && !qProfile.hoursTouched) Object.assign(qProfile, defaultHoursFor(value));
+          renderQuestionnaireStep();
+          setTimeout(questionnaireNext, 180);
+        }
+      });
+      options.appendChild(btn);
+    });
+    container.appendChild(options);
+  } else if (step.type === "hours") {
+    if (qProfile.debut === undefined) Object.assign(qProfile, defaultHoursFor(qProfile.situation));
+    const row = document.createElement("div");
+    row.className = "q-hours";
+    const makeSelect = (label, key, from, to) => {
+      const wrap = document.createElement("label");
+      wrap.textContent = label;
+      const select = document.createElement("select");
+      for (let h = from; h <= to; h++) {
+        const opt = document.createElement("option");
+        opt.value = h;
+        opt.textContent = `${h}h`;
+        if (h === qProfile[key]) opt.selected = true;
+        select.appendChild(opt);
+      }
+      select.addEventListener("change", () => {
+        qProfile[key] = Number(select.value);
+        qProfile.hoursTouched = true;
+        // La fin doit rester après le début.
+        if (qProfile.fin <= qProfile.debut) qProfile[key === "debut" ? "fin" : "debut"] = key === "debut" ? qProfile.debut + 1 : qProfile.fin - 1;
+        renderQuestionnaireStep();
+      });
+      wrap.appendChild(select);
+      return wrap;
+    };
+    row.append(makeSelect("Début", "debut", 0, 23), makeSelect("Fin", "fin", 1, 24));
+    container.appendChild(row);
+  } else if (step.type === "theme") {
+    const list = document.createElement("div");
+    list.className = "theme-list";
+    const current = qProfile.theme || loadTheme();
+    THEMES.forEach((theme) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "theme-option" + (theme.id === current ? " selected" : "");
+      option.innerHTML = `<span class="theme-swatch">${theme.swatch
+        .map((c) => `<span style="background:${c}"></span>`)
+        .join("")}</span><span>${escapeHtml(theme.label)}</span>`;
+      option.addEventListener("click", () => {
+        qProfile.theme = theme.id;
+        applyTheme(theme.id); // aperçu en direct
+        renderQuestionnaireStep();
+      });
+      list.appendChild(option);
+    });
+    container.appendChild(list);
+  }
+}
+
+// Ce que le questionnaire va préparer, affiché avant de valider (et appliqué par applyProfile).
+function profileHabits(profile) {
+  const chosen = OBJECTIFS.filter((o) => (profile.objectifs || []).includes(o.id));
+  return {
+    daily: chosen.filter((o) => o.habit).map((o) => o.habit),
+    monthly: chosen.filter((o) => o.monthly).map((o) => o.monthly),
+  };
+}
+
+function renderQuestionnaireRecap(container) {
+  const p = qProfile;
+  const items = [];
+  items.push(`📅 Ton calendrier affichera de ${p.debut}h à ${p.fin}h.`);
+  if (p.zone && p.zone !== "aucune") items.push(`🏖️ Les vacances de la zone ${p.zone} seront grisées.`);
+  if (p.semainesAB === "A" || p.semainesAB === "B") items.push(`🅰️🅱️ Semaines A/B réglées : cette semaine est une semaine ${p.semainesAB}.`);
+  const { daily, monthly } = profileHabits(p);
+  if (daily.length + monthly.length > 0) {
+    items.push(`🎯 Une liste « Mes objectifs » dans ton To-do avec : ${[...daily, ...monthly].join(", ")}.`);
+  }
+  if (p.pourQui.includes("famille")) items.push("👨‍👩‍👧 L'espace Famille t'attend : ajoute les membres depuis le Menu → Personnes.");
+  if (p.pourQui.includes("entreprise")) items.push("🏢 L'espace Entreprise t'attend : ajoute ton équipe depuis le Menu → Personnes.");
+  if (STUDENT_SITUATIONS.includes(p.situation)) items.push("📥 Astuce : importe ton emploi du temps (.ics ou .pdf) depuis le Menu → Importer.");
+
+  const ul = document.createElement("ul");
+  ul.className = "q-recap";
+  items.forEach((text) => {
+    const li = document.createElement("li");
+    li.textContent = text;
+    ul.appendChild(li);
+  });
+  container.appendChild(ul);
+
+  const note = document.createElement("p");
+  note.className = "q-sub";
+  note.textContent =
+    "Tes réponses restent sur cet appareil. Tu peux les changer quand tu veux (Menu → Mon profil)." +
+    (qIsRedo ? " Les habitudes déjà créées ne seront pas recréées en double." : "");
+  container.appendChild(note);
+
+  if (p.age === "moins15") {
+    const parent = document.createElement("p");
+    parent.className = "q-note";
+    parent.textContent = "👋 Comme tu as moins de 15 ans : quand on ajoutera les comptes en ligne, un parent devra donner son accord avec toi.";
+    container.appendChild(parent);
+  }
+}
+
+// Lit/écrit une donnée d'un espace précis sans changer durablement l'espace affiché.
+function readSpaceValue(espace, fn) {
+  const previous = currentEspace();
+  setCurrentEspace(espace);
+  try {
+    return fn();
+  } finally {
+    setCurrentEspace(previous);
+  }
+}
+
+function applyProfile(profile) {
+  saveProfile(profile);
+  if (profile.theme) applyTheme(profile.theme);
+
+  // Plage horaire (et vacances / semaines A/B sauf en Entreprise) dans chaque espace utilisé.
+  const espaces = ["solo", ...profile.pourQui.filter((e) => e !== "solo")];
+  espaces.forEach((espace) =>
+    readSpaceValue(espace, () => {
+      saveRange({ start: profile.debut, end: profile.fin });
+      if (espace === "entreprise") return;
+      if (profile.zone) saveZoneVacances(profile.zone);
+      if (profile.semainesAB === "A" || profile.semainesAB === "B") {
+        const monday = getMonday(new Date());
+        if (profile.semainesAB === "B") monday.setDate(monday.getDate() - 7);
+        saveSemaineARef(toISODate(monday));
+      }
+    })
+  );
+
+  // Habitudes des objectifs, dans la liste "Mes objectifs" du Solo (sans doublons).
+  const { daily, monthly } = profileHabits(profile);
+  if (daily.length + monthly.length > 0) {
+    readSpaceValue("solo", () => {
+      const previousListeId = currentTodoListeId();
+      let liste = loadTodoListes().find((l) => l.type === "habitudes" && l.nom === OBJECTIFS_LISTE_NOM);
+      if (!liste) {
+        addTodoListe(OBJECTIFS_LISTE_NOM, "habitudes");
+        liste = loadTodoListes().find((l) => l.nom === OBJECTIFS_LISTE_NOM);
+      }
+      const existing = loadHabits().filter((h) => h.listeId === liste.id).map((h) => h.nom);
+      daily.filter((nom) => !existing.includes(nom)).forEach((nom) => addHabit(liste.id, nom));
+      const existingMonthly = loadMonthlyHabits().filter((h) => h.listeId === liste.id).map((h) => h.nom);
+      monthly.filter((nom) => !existingMonthly.includes(nom)).forEach((nom) => addMonthlyHabit(liste.id, nom));
+      // Le To-do s'ouvre sur le Tableau de bord la première fois (là où les routines apparaissent).
+      saveCurrentTodoListeId(qIsRedo ? previousListeId : TODO_SPECIAL_DASHBOARD);
+    });
+  }
+}
+
+function finishQuestionnaire() {
+  const profile = { ...qProfile, date: toISODate(new Date()) };
+  applyProfile(profile);
+  closeQuestionnaire();
+  if (qIsRedo) {
+    applyEspaceUI();
+  } else {
+    // Première fois : on démarre dans l'espace principal choisi.
+    const first = ["solo", "famille", "entreprise"].find((e) => profile.pourQui.includes(e)) || "solo";
+    setCurrentEspace(first);
+    showApp(loadUser() || {});
+  }
 }
 
 // --- Espaces (Solo / Entreprise / Famille) ---
@@ -2460,7 +2872,88 @@ function renderDayTasksPage() {
 
 // --- Tableau de bord : aujourd'hui, routines, et aperçu des listes existantes ---
 
+// Quelques propositions selon le profil (questionnaire) et ce qui existe déjà : 3 au maximum.
+function dashboardSuggestions() {
+  const profile = loadProfile();
+  const espace = currentEspace();
+  const goTo = (espaceId, menuTabId) => () => {
+    closeTodoModal();
+    if (espaceId !== espace) selectEspace(espaceId);
+    if (menuTabId) openMenuDetail(menuTabId);
+  };
+  const suggestions = [];
+
+  if (!profile) {
+    suggestions.push({
+      text: "Réponds à quelques questions (1 min) pour un planning à ta façon.",
+      action: "Commencer",
+      onClick: () => {
+        closeTodoModal();
+        openQuestionnaire(true);
+      },
+    });
+    return suggestions;
+  }
+
+  if (espace === "solo" && STUDENT_SITUATIONS.includes(profile.situation) && loadCourses().length === 0) {
+    suggestions.push({ text: "Importe ton emploi du temps (.ics ou .pdf) pour ne pas tout retaper.", action: "Importer", onClick: goTo("solo", "import") });
+  }
+  [
+    ["famille", "Ajoute les membres de ta famille dans l'espace Famille."],
+    ["entreprise", "Ajoute les personnes de ton équipe dans l'espace Entreprise."],
+  ].forEach(([espaceId, text]) => {
+    const empty = readSpaceValue(espaceId, () => loadPersonnes().length === 0);
+    if ((profile.pourQui || []).includes(espaceId) && empty) {
+      suggestions.push({ text, action: "Y aller", onClick: goTo(espaceId, "personnes") });
+    }
+  });
+
+  // Encouragements sur les habitudes des objectifs (Solo seulement, là où elles sont créées).
+  if (espace === "solo") {
+    const liste = loadTodoListes().find((l) => l.type === "habitudes" && l.nom === OBJECTIFS_LISTE_NOM);
+    if (liste) {
+      const checks = loadHabitChecks();
+      const todayISO = toISODate(new Date());
+      const habits = loadHabits().filter((h) => h.listeId === liste.id);
+      const best = habits
+        .map((h) => ({ h, streak: habitStreak(h.id, checks) }))
+        .sort((a, b) => b.streak - a.streak)[0];
+      const todo = habits.find((h) => !checks.some((c) => c.habitId === h.id && c.date === todayISO));
+      if (best && best.streak >= 2) {
+        suggestions.push({ text: `🔥 ${best.streak} jours d'affilée pour « ${best.h.nom} », continue !` });
+      } else if (todo) {
+        suggestions.push({ text: `Petit objectif du jour : « ${todo.nom} ».` });
+      }
+    }
+  }
+  return suggestions.slice(0, 3);
+}
+
+function renderDashboardSuggestions() {
+  const suggestions = dashboardSuggestions();
+  const el = document.getElementById("dashboardSuggestions");
+  document.getElementById("dashboardSuggestionsSection").classList.toggle("hidden", suggestions.length === 0);
+  el.innerHTML = "";
+  suggestions.forEach((s) => {
+    const card = document.createElement("div");
+    card.className = "dashboard-suggestion";
+    const text = document.createElement("span");
+    text.textContent = s.text;
+    card.appendChild(text);
+    if (s.action) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn-ghost";
+      btn.textContent = s.action;
+      btn.addEventListener("click", s.onClick);
+      card.appendChild(btn);
+    }
+    el.appendChild(card);
+  });
+}
+
 function renderDashboard() {
+  renderDashboardSuggestions();
   renderDayTasksInto(
     document.getElementById("dashboardDayTasks"),
     toISODate(new Date()),
