@@ -785,6 +785,12 @@ main {
   margin-bottom: 6px;
 }
 .dashboard-habit-group .todo-list { gap: 6px; }
+.dashboard-habit-subtitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 10px 0 6px;
+}
 
 .dashboard-liste-row {
   display: flex;

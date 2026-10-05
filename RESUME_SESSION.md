@@ -50,7 +50,7 @@ Bouton en haut (ex : "🙋 Solo") pour basculer :
 
 ## Le To-do (bouton "✅ To-do", plein écran façon Notes, données par espace)
 Barre latérale : **📊 Tableau de bord**, **🎯 Tâches du jour**, puis les listes créées via "+ Nouvelle liste" (choix du type) :
-- **Tableau de bord** (par défaut) : "Aujourd'hui" (tâches du jour cochables), "Routines" (habitudes du jour, cochables, synchronisées avec les grilles), "Mes listes" (nombre de tâches restantes, clic = ouvre la liste).
+- **Tableau de bord** (par défaut) : "Aujourd'hui" (tâches du jour cochables), "Routines" (habitudes du jour + habitudes mensuelles du mois en cours sous "📅 Ce mois-ci", cochables, synchronisées avec les listes), "Mes listes" (nombre de tâches restantes, clic = ouvre la liste).
 - **Tâches du jour** : liste de tâches pour **Aujourd'hui / Demain** (préparer la veille).
 - **Liste normale** : onglets "À faire" / "✅ Déjà fait" (cocher = déplacer, recliquer = annuler, ✕ = supprimer).
 - **Liste d'habitudes** (🔁) : vrai tableau jour × habitude (tous les jours du mois visibles sans défilement sur PC), % de réussite + série 🔥 par habitude, résumé global (% / Complété / Incomplet / Total), sélecteur "Cette semaine / Tout le mois" (ne change que les stats), navigation de mois, et section **📅 Habitudes mensuelles** (cochées une fois par mois, série en mois).
@@ -58,7 +58,6 @@ Inspiré de 2 vidéos de "habit trackers" (tableur) que Nohlan avait fournies.
 
 ## Idées non faites / possibles suites
 - Objectifs mensuels / suivi humeur-sommeil dans les habitudes (idée n°6 de la liste d'origine).
-- Afficher les habitudes mensuelles dans le Tableau de bord.
 - Un vrai compte multi-appareils (Supabase) a été évoqué puis mis de côté.
 - Cas PDF non résolu : cases de groupes A/B d'élèves mélangées (demander le groupe de Nohlan).
 

@@ -2469,11 +2469,34 @@ function renderDashboard() {
   );
 
   const todayISO = toISODate(new Date());
+  const monthStr = monthStrOf(new Date());
   const habits = loadHabits();
   const checks = loadHabitChecks();
-  const habitListes = loadTodoListes().filter((l) => l.type === "habitudes" && habits.some((h) => h.listeId === l.id));
+  const monthlyHabits = loadMonthlyHabits();
+  const monthlyChecks = loadMonthlyHabitChecks();
+  const habitListes = loadTodoListes().filter(
+    (l) => l.type === "habitudes" && (habits.some((h) => h.listeId === l.id) || monthlyHabits.some((h) => h.listeId === l.id))
+  );
   const habitsEl = document.getElementById("dashboardHabits");
   habitsEl.innerHTML = "";
+
+  // Une ligne cochable (habitude du jour ou du mois) : cliquer coche/décoche puis redessine.
+  const habitRow = (h, checked, onToggle) => {
+    const row = document.createElement("div");
+    row.className = "todo-item" + (checked ? " done" : "");
+    const main = document.createElement("button");
+    main.type = "button";
+    main.className = "todo-item-main";
+    const checkStyle = checked ? habitCheckStyle(h.couleur) : "";
+    main.innerHTML = `<span class="todo-check"${checkStyle}>${checked ? "✓" : ""}</span><span class="todo-texte">${escapeHtml(h.nom)}</span>`;
+    main.addEventListener("click", () => {
+      onToggle();
+      renderDashboard();
+    });
+    row.appendChild(main);
+    return row;
+  };
+
   if (habitListes.length === 0) {
     habitsEl.innerHTML = '<p class="import-explainer">Crée une liste d\'habitudes pour voir tes routines ici.</p>';
   } else {
@@ -2491,21 +2514,26 @@ function renderDashboard() {
         .filter((h) => h.listeId === liste.id)
         .forEach((h) => {
           const checked = checks.some((c) => c.habitId === h.id && c.date === todayISO);
-          const row = document.createElement("div");
-          row.className = "todo-item" + (checked ? " done" : "");
-          const main = document.createElement("button");
-          main.type = "button";
-          main.className = "todo-item-main";
-          const checkStyle = checked ? habitCheckStyle(h.couleur) : "";
-          main.innerHTML = `<span class="todo-check"${checkStyle}>${checked ? "✓" : ""}</span><span class="todo-texte">${escapeHtml(h.nom)}</span>`;
-          main.addEventListener("click", () => {
-            toggleHabitCheck(h.id, todayISO);
-            renderDashboard();
-          });
-          row.appendChild(main);
-          rows.appendChild(row);
+          rows.appendChild(habitRow(h, checked, () => toggleHabitCheck(h.id, todayISO)));
         });
       group.appendChild(rows);
+
+      // Habitudes mensuelles de la liste, pour le mois en cours (cochées une fois par mois).
+      const monthly = monthlyHabits.filter((h) => h.listeId === liste.id);
+      if (monthly.length > 0) {
+        const subTitle = document.createElement("div");
+        subTitle.className = "dashboard-habit-subtitle";
+        subTitle.textContent = "📅 Ce mois-ci";
+        group.appendChild(subTitle);
+        const monthlyRows = document.createElement("div");
+        monthlyRows.className = "todo-list";
+        monthly.forEach((h) => {
+          const checked = monthlyChecks.some((c) => c.habitId === h.id && c.month === monthStr);
+          monthlyRows.appendChild(habitRow(h, checked, () => toggleMonthlyHabitCheck(h.id, monthStr)));
+        });
+        group.appendChild(monthlyRows);
+      }
+
       habitsEl.appendChild(group);
     });
   }
