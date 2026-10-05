@@ -45,7 +45,7 @@ Bouton en haut (ex : "🙋 Solo") pour basculer :
 - **Impression** : Menu → 🖨️ Imprimer (CSS `@media print`, fond clair quel que soit le thème).
 - Planning mensuel : la grille s'arrête à la fin de la semaine qui contient le dernier jour du mois (`monthGridCellCount`).
 - **Texte lisible** : `readableTextColor()` choisit texte sombre ou blanc selon la luminance de la couleur de fond (seuil 0.25).
-- **11 thèmes** (Menu → Thème) : Clair, Pastel, Nature, Vibrant, Ardoise, Sombre, Océan + **Forêt, Améthyste, Braise, Rose nuit**. Les couleurs d'activités/habitudes/présence sont **nuancées vers l'accent du thème** (`themeAdaptColor()`, la couleur enregistrée n'est jamais modifiée) ; changer de thème redessine la vue.
+- **11 thèmes** (Menu → Thème) : Clair, Pastel, Nature, Vibrant, Ardoise, Sombre, Océan + **Forêt, Améthyste, Braise, Rose nuit**. Les couleurs d'activités/habitudes/présence sont **nuancées vers l'accent du thème** (`themeAdaptColor()`, la couleur enregistrée n'est jamais modifiée) ; changer de thème redessine la vue et le To-do s'il est ouvert (cases d'habitudes cochées comprises, ✓ lisible via `habitCheckStyle()`).
 - Mobile : barre du haut réorganisée (titre au-dessus, 3 boutons en ligne + "+ Ajouter une activité" pleine largeur), cases du mois à hauteur fixe (plus de lignes qui s'étirent).
 
 ## Le To-do (bouton "✅ To-do", plein écran façon Notes, données par espace)
@@ -59,7 +59,6 @@ Inspiré de 2 vidéos de "habit trackers" (tableur) que Nohlan avait fournies.
 ## Idées non faites / possibles suites
 - Objectifs mensuels / suivi humeur-sommeil dans les habitudes (idée n°6 de la liste d'origine).
 - Afficher les habitudes mensuelles dans le Tableau de bord.
-- Le Tableau de bord/To-do ne se redessine pas tout seul au changement de thème (seulement la vue calendrier).
 - Un vrai compte multi-appareils (Supabase) a été évoqué puis mis de côté.
 - Cas PDF non résolu : cases de groupes A/B d'élèves mélangées (demander le groupe de Nohlan).
 

@@ -1141,6 +1141,8 @@ function applyTheme(themeId) {
   }
   // Les couleurs des activités s'adaptent au thème : on redessine la vue affichée.
   if (!document.getElementById("appRoot").classList.contains("hidden")) switchView(currentView);
+  // Pareil pour le To-do s'il est ouvert (habitudes, routines du Tableau de bord…).
+  if (!document.getElementById("todoModalOverlay").classList.contains("hidden")) renderTodoSpace();
 }
 
 function renderThemeList() {
@@ -1778,6 +1780,12 @@ function readableTextColor(colors) {
   return avg > 0.25 ? "#22223B" : "#FFFFFF";
 }
 
+// Style d'une case d'habitude cochée : couleur nuancée par le thème + ✓ lisible dessus.
+function habitCheckStyle(couleur) {
+  const c = themeAdaptColor(couleur);
+  return ` style="background:${c};border-color:${c};color:${readableTextColor([c])}"`;
+}
+
 function getCourseTextColor(course) {
   return readableTextColor(getCourseColors(course));
 }
@@ -2373,7 +2381,7 @@ function renderMonthlyHabits() {
     const main = document.createElement("button");
     main.type = "button";
     main.className = "todo-item-main";
-    const checkStyle = checked ? ` style="background:${h.couleur};border-color:${h.couleur}"` : "";
+    const checkStyle = checked ? habitCheckStyle(h.couleur) : "";
     main.innerHTML = `<span class="todo-check"${checkStyle}>${checked ? "✓" : ""}</span><span class="todo-texte">${escapeHtml(h.nom)}</span><span class="habit-pct">${streak > 0 ? "🔥 " + streak + " mois" : ""}</span>`;
     main.addEventListener("click", () => {
       toggleMonthlyHabitCheck(h.id, monthStr);
@@ -2488,7 +2496,7 @@ function renderDashboard() {
           const main = document.createElement("button");
           main.type = "button";
           main.className = "todo-item-main";
-          const checkStyle = checked ? ` style="background:${h.couleur};border-color:${h.couleur}"` : "";
+          const checkStyle = checked ? habitCheckStyle(h.couleur) : "";
           main.innerHTML = `<span class="todo-check"${checkStyle}>${checked ? "✓" : ""}</span><span class="todo-texte">${escapeHtml(h.nom)}</span>`;
           main.addEventListener("click", () => {
             toggleHabitCheck(h.id, todayISO);
