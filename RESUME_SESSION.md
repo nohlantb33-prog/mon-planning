@@ -20,7 +20,7 @@ Commits en attente (du plus ancien au plus récent) :
 4. `842cb23` Planning mensuel qui s'arrête à la fin de la dernière semaine du mois
 5. `9870f4b` 4 nouveaux thèmes sombres colorés (Forêt, Améthyste, Braise, Rose nuit)
 6. `5d294c6` Couleurs d'activités adaptées au thème choisi
-(+ éventuellement un 7e commit : la mise à jour de ce fichier RESUME_SESSION.md.)
+(+ quelques petits commits sans importance qui ne concernent que ce fichier RESUME_SESSION.md. Le nombre exact se voit avec `git log origin/main..HEAD --oneline` ; un seul `git push` envoie tout.)
 
 Identité Git configurée en local : Nohlan / nohlantb33@gmail.com. Pour voir ce qui reste à pousser : `git log origin/main..HEAD --oneline`.
 
