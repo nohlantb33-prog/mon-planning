@@ -8,7 +8,7 @@ Nohlan (lycéen) construit avec Claude Code un site de planning **100 % statique
 - **Site en ligne (Netlify, URL non référencée, protégée par connexion) :** https://splendorous-douhua-9e49e6.netlify.app — se redéploie automatiquement à chaque push sur `main`
 - **Installable comme une app** (PWA : manifest + service worker + icônes). Testé installé sur le téléphone de Nohlan.
 
-## ⚠️ État Git : des commits PAS ENCORE poussés (9 vraies nouveautés)
+## ⚠️ État Git : des commits PAS ENCORE poussés (10 vraies nouveautés)
 Les commits ci-dessous existent seulement sur le PC. Pour les mettre en ligne (et sur le téléphone), Nohlan lance **dans son propre terminal PowerShell** (l'outil de Claude n'a pas internet ni de TTY pour la connexion GitHub) :
 ```
 git push
@@ -22,7 +22,8 @@ Commits en attente (du plus ancien au plus récent) :
 6. `5d294c6` Couleurs d'activités adaptées au thème choisi
 7. `a147570` Le To-do suit aussi le thème choisi
 8. `0ffa4b6` Habitudes mensuelles visibles dans le Tableau de bord
-9. (ce commit) Questionnaire de personnalisation + suggestions « Pour toi »
+9. `4914e56` Questionnaire de personnalisation + suggestions « Pour toi »
+10. (ce commit) Page « Mon profil » modifiable, âge calculé depuis la naissance, heures déplacées dans le profil, bug du questionnaire bloqué corrigé
 ⚠️ Avant ce push : passer `CACHE_NAME` de `sw.js` à `mon-planning-v2` pour que les téléphones rechargent les fichiers.
 (+ quelques petits commits sans importance qui ne concernent que ce fichier RESUME_SESSION.md. Le nombre exact se voit avec `git log origin/main..HEAD --oneline` ; un seul `git push` envoie tout.)
 
@@ -44,7 +45,7 @@ Bouton en haut (ex : "🙋 Solo") pour basculer :
 ## Fonctionnalités du planning
 - Vues Jour / Semaine / Mois, transitions en fondu, bouton "Aujourd'hui"/"Mois actuel", clic sur un jour (Mois ou en-tête de Semaine) → ouvre la vue Jour.
 - Formulaire d'activité : Ponctuel / Hebdomadaire / Quotidien, Semaines A/B, fin de répétition, importance (Mois n'affiche que Important / Très important sauf en Entreprise où tout s'affiche), salle/prof, 20 couleurs (même nom = même couleur).
-- Vacances scolaires 2026-2027 (zones A/B/C), plage horaire réglable, division en demi-heures.
+- Vacances scolaires 2026-2027 (zones A/B/C), plage horaire réglable (dans Menu → Mon profil), division en demi-heures.
 - Import **.ics** (fiable) et **.pdf** (détection par rectangles colorés, écran de vérification) ; "Vider mon planning".
 - **Impression** : Menu → 🖨️ Imprimer (CSS `@media print`, fond clair quel que soit le thème).
 - Planning mensuel : la grille s'arrête à la fin de la semaine qui contient le dernier jour du mois (`monthGridCellCount`).
@@ -60,17 +61,19 @@ Barre latérale : **📊 Tableau de bord**, **🎯 Tâches du jour**, puis les l
 - **Liste d'habitudes** (🔁) : vrai tableau jour × habitude (tous les jours du mois visibles sans défilement sur PC), % de réussite + série 🔥 par habitude, résumé global (% / Complété / Incomplet / Total), sélecteur "Cette semaine / Tout le mois" (ne change que les stats), navigation de mois, et section **📅 Habitudes mensuelles** (cochées une fois par mois, série en mois).
 Inspiré de 2 vidéos de "habit trackers" (tableur) que Nohlan avait fournies.
 
-## Questionnaire de personnalisation (ajouté le 2026-10-05)
-- Après l.écran prénom + e-mail (bouton « Continuer »), un questionnaire d.une question par écran, avec barre de progression : âge (tranche), situation (collège/lycée/études/travail/recherche/autre), zone de vacances et semaines A/B (seulement pour les élèves/étudiants), pour qui (Moi / Famille / Entreprise), objectifs (10 choix), heures de la journée (pré-remplies selon la situation), thème (aperçu en direct), puis un récapitulatif. Les choix uniques passent tout seuls à la question suivante ; le bouton devient « Passer » si on ne répond pas.
-- Validation (`applyProfile()`) : plage horaire dans chaque espace choisi, zone + semaine A/B (sauf Entreprise), thème, et une liste d.habitudes **« 🎯 Mes objectifs »** dans le To-do du Solo (habitudes quotidiennes et mensuelles selon `OBJECTIFS`, jamais en double). Démarre dans l.espace principal choisi.
-- Réponses dans `monPlanningProfil` (clé globale, pas par espace) : objet unique prévu pour être envoyé tel quel dans Supabase plus tard.
-- Menu → **👤 Mon profil** pour le refaire (réponses pré-remplies, bouton ✕/Fermer).
-- Tableau de bord : carte **« 💡 Pour toi »** (3 suggestions max, `dashboardSuggestions()`) : faire le questionnaire s.il n.a jamais été rempli, importer son emploi du temps (élève sans activités), ajouter les membres Famille/Entreprise, encouragement sur les habitudes des objectifs (série 🔥 ou « petit objectif du jour »).
-- Moins de 15 ans : message dans le récapitulatif (accord d.un parent nécessaire quand il y aura les comptes en ligne).
+## Questionnaire de personnalisation + page « Mon profil » (2026-10-05)
+- Après l'écran prénom + e-mail (bouton « Continuer »), un questionnaire d'une question par écran, avec barre de progression : **mois + année de naissance** (l'âge se calcule tout seul, `ageFromNaissance()` / `describeAge()` → ex. « 17 ans · 18 ans en mai 2027 »), situation (collège/lycée/études/travail/recherche/autre), zone de vacances et semaines A/B (seulement pour les élèves/étudiants), pour qui (Moi / Famille / Entreprise), objectifs (10 choix), heures affichées (pré-remplies selon la situation), thème (aperçu en direct), puis un récapitulatif. Les choix uniques passent tout seuls à la question suivante (minuteur `qAdvanceTimer`, annulé si on navigue) ; le bouton devient « Passer » si on ne répond pas.
+- Validation (`applyProfile()`, découpée en `applyProfileHours` / `applyProfileZone` / `applyProfileSemaine` / `applyProfileHabits`) : heures dans les 3 espaces, zone + semaine A/B (Solo + Famille), thème, et une liste d'habitudes **« 🎯 Mes objectifs »** dans le To-do du Solo (habitudes quotidiennes et mensuelles selon `OBJECTIFS`, jamais en double). Démarre dans l'espace principal choisi.
+- Réponses dans `monPlanningProfil` (clé globale, pas par espace) : objet unique prévu pour être envoyé tel quel dans Supabase plus tard. Les anciens profils avec une tranche d'âge (`age`) restent compris (`isUnder15()`) ; la tranche est supprimée dès qu'une date de naissance est indiquée.
+- **Menu → 👤 Mon profil** : page qui affiche toutes les réponses, **modifiables une par une** avec enregistrement immédiat (« ✓ Enregistré ») : prénom, e-mail, naissance, situation, zone, semaines A/B (affiche la vraie lettre de la semaine en cours), heures affichées, pour qui, objectifs (cocher = ajoute les habitudes ; décocher ne les supprime pas), thème (bouton vers Menu → Thème). Bouton **« 🔁 Refaire le questionnaire »** en bas.
+- Le réglage « Afficher de …h à …h » a été **retiré de l'écran principal** : les heures se règlent seulement dans Mon profil (les mêmes dans les 3 espaces).
+- Tableau de bord : carte **« 💡 Pour toi »** (3 suggestions max, `dashboardSuggestions()`) : faire le questionnaire s'il n'a jamais été rempli, importer son emploi du temps (élève sans activités), ajouter les membres Famille/Entreprise, encouragement sur les habitudes des objectifs (série 🔥 ou « petit objectif du jour »).
+- Moins de 15 ans : message dans le récapitulatif (accord d'un parent nécessaire quand il y aura les comptes en ligne).
+- Bug corrigé : les boutons Suivant/Retour/✕ n'étaient branchés que lors de la toute première visite, donc le questionnaire relancé plus tard se bloquait à « Pour qui » (1re étape sans passage automatique).
 
 ## Idées non faites / possibles suites
 - Objectifs mensuels / suivi humeur-sommeil : **mis de côté** (2026-10-05). Nohlan voulait le relier à Santé (iPhone) ou à d'autres apps de suivi, impossible pour un site web (HealthKit et Health Connect sont réservés aux vraies apps natives). On y reviendra si le site devient une vraie app. Pistes notées : saisie rapide humeur + sommeil dans le site, ou pont semi-automatique via l'app Raccourcis iPhone (à tester : Safari et l'app installée ne partagent pas leur localStorage).
-- **Comptes Supabase (prochain gros chantier, décidé le 2026-10-05)** : plan validé avec Nohlan : (1) questionnaire ✅ fait ; (2) comptes perso (Supabase Auth, Solo synchronisé PC/téléphone, import des données locales à la 1re connexion) ; (3) espaces Famille/Entreprise partagés (tables espaces + membres avec rôles propriétaire/admin/membre, code d.invitation) ; (4) temps réel + page Confidentialité + suppression de compte. Sécurité : Row Level Security obligatoire, ne jamais mettre la clé service_role dans le site. Gratuit : 500 Mo, 50 000 utilisateurs/mois, **pause après 7 jours sans activité**, pas de sauvegardes. RGPD : moins de 15 ans = accord d.un parent. Nohlan doit créer lui-même le compte supabase.com (Claude ne peut pas créer de compte).
+- **Comptes Supabase (prochain gros chantier, décidé le 2026-10-05)** : plan validé avec Nohlan : (1) questionnaire ✅ fait ; (2) comptes perso (Supabase Auth, Solo synchronisé PC/téléphone, import des données locales à la 1re connexion) ; (3) espaces Famille/Entreprise partagés (tables espaces + membres avec rôles propriétaire/admin/membre, code d'invitation) ; (4) temps réel + page Confidentialité + suppression de compte. Sécurité : Row Level Security obligatoire, ne jamais mettre la clé service_role dans le site. Gratuit : 500 Mo, 50 000 utilisateurs/mois, **pause après 7 jours sans activité**, pas de sauvegardes. RGPD : moins de 15 ans = accord d'un parent. Nohlan doit créer lui-même le compte supabase.com (Claude ne peut pas créer de compte).
 - Cas PDF non résolu : cases de groupes A/B d'élèves mélangées (demander le groupe de Nohlan).
 
 ## Détails techniques utiles

@@ -200,7 +200,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
+  z-index: 1100;
   padding: 20px;
   overflow-y: auto;
 }
@@ -482,26 +482,6 @@ main {
   font-weight: 600;
   min-width: 220px;
   text-align: center;
-}
-
-.range-control {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-
-.range-control select {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 4px 6px;
-  font-family: inherit;
-  font-size: 0.85rem;
-  color: var(--text);
 }
 
 .hint {
@@ -1429,6 +1409,7 @@ main {
 }
 
 .modal input[type="text"],
+.modal input[type="email"],
 .modal input[type="time"],
 .modal input[type="date"],
 .modal input[type="number"],
@@ -1613,7 +1594,6 @@ main {
   .todo-fullscreen,
   .view-switch,
   .btn-today,
-  .range-control,
   .hint,
   .import-explainer,
   #prevWeek, #nextWeek,
@@ -1633,4 +1613,59 @@ main {
 
   .calendar { overflow: visible; }
   .month-cell { min-height: 90px; }
+}
+
+/* Menu → Mon profil : chaque réponse modifiable séparément. */
+.profil-saved {
+  position: sticky;
+  top: 0;
+  float: right;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.profil-saved.visible { opacity: 1; }
+.profil-section {
+  font-size: 0.95rem;
+  margin: 18px 0 10px;
+  color: var(--text);
+}
+.profil-section:first-child { margin-top: 0; }
+.profil-field { margin-bottom: 14px; }
+.profil-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.profil-field > input,
+.profil-field > select { margin-top: 6px; }
+.profil-field .q-hours { margin-top: 6px; gap: 10px; }
+.modal .profil-field .q-hours label { margin-bottom: 0; }
+.profil-aide {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.profil-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.profil-chips .q-option {
+  padding: 7px 10px;
+  font-size: 0.82rem;
+}
+.profil-inline-btn { margin-top: 6px; }
+.profil-redo { width: 100%; margin-top: 8px; }
+.onboarding-card .q-age,
+.q-age {
+  margin-top: 12px;
+  font-weight: 600;
+  color: var(--text);
 }

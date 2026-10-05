@@ -1168,7 +1168,7 @@ function renderThemeList() {
 // Pour ajouter une section : un objet {id, label, panelId, render} ici, plus le
 // <div id="panelId">...</div> correspondant dans index.html.
 const MENU_TABS = [
-  { id: "profil", label: "👤 Mon profil", action: () => { closeMenuModal(); openQuestionnaire(true); } },
+  { id: "profil", label: "👤 Mon profil", panelId: "menuTabProfil", render: renderProfilPanel },
   { id: "theme", label: "🎨 Thème", panelId: "menuTabTheme", render: renderThemeList },
   { id: "tips", label: "💡 Astuces", panelId: "menuTabTips", render: renderTipsList },
   { id: "print", label: "🖨️ Imprimer", action: () => { closeMenuModal(); window.print(); } },
@@ -1845,6 +1845,12 @@ function showApp(user) {
 }
 
 function initOnboarding() {
+  // Boutons du questionnaire branchés dans tous les cas : il peut aussi être relancé plus tard
+  // (Menu → Mon profil, carte "Pour toi") par quelqu'un qui a déjà passé l'écran de bienvenue.
+  document.getElementById("qBackBtn").addEventListener("click", questionnaireBack);
+  document.getElementById("qNextBtn").addEventListener("click", questionnaireNext);
+  document.getElementById("qCloseBtn").addEventListener("click", closeQuestionnaire);
+
   const user = loadUser();
   if (user) {
     showApp(user);
@@ -1860,10 +1866,6 @@ function initOnboarding() {
     saveUser(user);
     openQuestionnaire(false);
   });
-
-  document.getElementById("qBackBtn").addEventListener("click", questionnaireBack);
-  document.getElementById("qNextBtn").addEventListener("click", questionnaireNext);
-  document.getElementById("qCloseBtn").addEventListener("click", closeQuestionnaire);
 }
 
 // --- Questionnaire de personnalisation (après le prénom, ou plus tard via Menu → Mon profil) ---
@@ -1899,69 +1901,96 @@ function defaultHoursFor(situation) {
   return { debut: 8, fin: 21 };
 }
 
+// Choix partagés entre le questionnaire et la page Menu → Mon profil.
+const SITUATION_OPTIONS = [
+  ["college", "🎒 Collège"],
+  ["lycee", "📚 Lycée"],
+  ["etudes", "🎓 Études supérieures"],
+  ["travail", "💼 Je travaille"],
+  ["recherche", "🔎 Je cherche un emploi"],
+  ["autre", "✨ Autre"],
+];
+const ZONE_OPTIONS = [
+  ["A", "Zone A"],
+  ["B", "Zone B"],
+  ["C", "Zone C"],
+  ["aucune", "Je ne sais pas / aucune"],
+];
+const SEMAINES_AB_OPTIONS = [
+  ["A", "Oui, et cette semaine c'est une semaine A"],
+  ["B", "Oui, et cette semaine c'est une semaine B"],
+  ["non", "Non / je ne sais pas"],
+];
+const POUR_QUI_OPTIONS = [
+  ["solo", "🙋 Moi"],
+  ["famille", "👨‍👩‍👧 Ma famille"],
+  ["entreprise", "🏢 Mon équipe / mon entreprise"],
+];
+const MOIS_NOMS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+
+function isSchoolSituation(situation) {
+  return situation === "college" || situation === "lycee";
+}
+
+// Âge calculé à partir du mois de naissance ("AAAA-MM") : il change tout seul le mois de
+// l'anniversaire (le jour exact n'est pas demandé, on compte l'anniversaire dès le 1er du mois).
+function ageFromNaissance(naissance, today = new Date()) {
+  if (!naissance) return null;
+  const [annee, mois] = naissance.split("-").map(Number);
+  let age = today.getFullYear() - annee;
+  if (today.getMonth() + 1 < mois) age--;
+  return age;
+}
+
+// Ex : "16 ans · 17 ans en mai 2027".
+function describeAge(naissance) {
+  const age = ageFromNaissance(naissance);
+  if (age === null) return "";
+  const [annee, mois] = naissance.split("-").map(Number);
+  const today = new Date();
+  const nextYear = today.getMonth() + 1 < mois ? today.getFullYear() : today.getFullYear() + 1;
+  const birthdayNow = today.getMonth() + 1 === mois;
+  const next = birthdayNow ? " · 🎂 c'est ton mois d'anniversaire !" : ` · ${age + 1} ans en ${MOIS_NOMS[mois - 1]} ${nextYear}`;
+  return `${age} ans${next}`;
+}
+
+// Moins de 15 ans (accord d'un parent requis pour les futurs comptes en ligne). Les anciens
+// profils n'ont qu'une tranche d'âge ("age"), sans date de naissance.
+function isUnder15(profile) {
+  const age = ageFromNaissance(profile.naissance);
+  return age !== null ? age < 15 : profile.age === "moins15";
+}
+
 // Les étapes : "when" (optionnel) masque l'étape si elle ne concerne pas la personne.
 const Q_STEPS = [
   {
-    id: "age",
-    type: "single",
-    title: "Quel âge as-tu ?",
-    sub: "Juste une tranche, pour adapter ce que je te propose.",
-    options: [
-      ["moins15", "Moins de 15 ans"],
-      ["15-17", "15 – 17 ans"],
-      ["18-25", "18 – 25 ans"],
-      ["26-40", "26 – 40 ans"],
-      ["41-60", "41 – 60 ans"],
-      ["plus60", "Plus de 60 ans"],
-    ],
+    id: "naissance",
+    type: "birth",
+    title: "Quand es-tu né(e) ?",
+    sub: "Le mois et l'année suffisent : ton âge se mettra à jour tout seul à chaque anniversaire.",
   },
-  {
-    id: "situation",
-    type: "single",
-    title: "Qu'est-ce que tu fais en ce moment ?",
-    options: [
-      ["college", "🎒 Collège"],
-      ["lycee", "📚 Lycée"],
-      ["etudes", "🎓 Études supérieures"],
-      ["travail", "💼 Je travaille"],
-      ["recherche", "🔎 Je cherche un emploi"],
-      ["autre", "✨ Autre"],
-    ],
-  },
+  { id: "situation", type: "single", title: "Qu'est-ce que tu fais en ce moment ?", options: SITUATION_OPTIONS },
   {
     id: "zone",
     type: "single",
-    when: (p) => p.situation === "college" || p.situation === "lycee",
+    when: (p) => isSchoolSituation(p.situation),
     title: "Ta zone de vacances scolaires ?",
     sub: "Les vacances seront grisées dans ton planning.",
-    options: [
-      ["A", "Zone A"],
-      ["B", "Zone B"],
-      ["C", "Zone C"],
-      ["aucune", "Je ne sais pas"],
-    ],
+    options: ZONE_OPTIONS,
   },
   {
     id: "semainesAB",
     type: "single",
     when: (p) => STUDENT_SITUATIONS.includes(p.situation),
     title: "Ton emploi du temps change entre semaine A et semaine B ?",
-    options: [
-      ["A", "Oui, et cette semaine c'est une semaine A"],
-      ["B", "Oui, et cette semaine c'est une semaine B"],
-      ["non", "Non / je ne sais pas"],
-    ],
+    options: SEMAINES_AB_OPTIONS,
   },
   {
     id: "pourQui",
     type: "multi",
     title: "Tu vas utiliser Mon Planning pour…",
     sub: "Plusieurs choix possibles.",
-    options: [
-      ["solo", "🙋 Moi"],
-      ["famille", "👨‍👩‍👧 Ma famille"],
-      ["entreprise", "🏢 Mon équipe / mon entreprise"],
-    ],
+    options: POUR_QUI_OPTIONS,
   },
   {
     id: "objectifs",
@@ -1978,6 +2007,8 @@ const Q_STEPS = [
 let qProfile = null;
 let qStepIndex = 0;
 let qIsRedo = false;
+// Minuteur du passage automatique après un choix unique (annulé si on navigue entre-temps).
+let qAdvanceTimer = null;
 
 function loadProfile() {
   try {
@@ -2002,10 +2033,15 @@ function openQuestionnaire(redo) {
   qProfile = saved
     ? { ...saved, pourQui: [...(saved.pourQui || [])], objectifs: [...(saved.objectifs || [])] }
     : { pourQui: [], objectifs: [] };
-  // Si une plage horaire a déjà été réglée à la main, on la propose plutôt que celle par défaut.
+  // On propose les réglages réellement en place (ils ont pu changer depuis via Mon profil) :
+  // heures affichées, zone, et lettre de la semaine en cours (qui change chaque semaine).
   const range = readSpaceValue("solo", () => loadRange());
-  if (qProfile.debut === undefined && !(range.start === 0 && range.end === 24)) {
+  if (!(range.start === 0 && range.end === 24)) {
     Object.assign(qProfile, { debut: range.start, fin: range.end, hoursTouched: true });
+  }
+  if (qProfile.zone) qProfile.zone = readSpaceValue("solo", () => loadZoneVacances());
+  if (qProfile.semainesAB === "A" || qProfile.semainesAB === "B") {
+    qProfile.semainesAB = readSpaceValue("solo", () => getWeekLetter(new Date()));
   }
   qStepIndex = 0;
   document.getElementById("onboardingWelcome").classList.add("hidden");
@@ -2021,6 +2057,7 @@ function closeQuestionnaire() {
 }
 
 function questionnaireBack() {
+  clearTimeout(qAdvanceTimer);
   if (qStepIndex === 0) {
     if (qIsRedo) {
       closeQuestionnaire();
@@ -2036,6 +2073,7 @@ function questionnaireBack() {
 }
 
 function questionnaireNext() {
+  clearTimeout(qAdvanceTimer);
   const steps = visibleQSteps();
   if (steps[qStepIndex].type === "recap") {
     finishQuestionnaire();
@@ -2048,7 +2086,7 @@ function questionnaireNext() {
 function isQStepAnswered(step) {
   const v = qProfile[step.id];
   if (step.type === "multi") return v && v.length > 0;
-  if (step.type === "single") return !!v;
+  if (step.type === "single" || step.type === "birth") return !!v;
   return true;
 }
 
@@ -2107,12 +2145,25 @@ function renderQuestionnaireStep() {
           // Choix unique : on passe tout seul à la question suivante.
           if (step.id === "situation" && !qProfile.hoursTouched) Object.assign(qProfile, defaultHoursFor(value));
           renderQuestionnaireStep();
-          setTimeout(questionnaireNext, 180);
+          clearTimeout(qAdvanceTimer);
+          qAdvanceTimer = setTimeout(questionnaireNext, 180);
         }
       });
       options.appendChild(btn);
     });
     container.appendChild(options);
+  } else if (step.type === "birth") {
+    const ageLine = document.createElement("p");
+    ageLine.className = "q-age";
+    ageLine.textContent = describeAge(qProfile.naissance);
+    container.append(
+      buildBirthSelects(qProfile.naissance, (naissance) => {
+        qProfile.naissance = naissance;
+        ageLine.textContent = describeAge(naissance);
+        nextBtn.textContent = naissance ? "Suivant" : "Passer";
+      }),
+      ageLine
+    );
   } else if (step.type === "hours") {
     if (qProfile.debut === undefined) Object.assign(qProfile, defaultHoursFor(qProfile.situation));
     const row = document.createElement("div");
@@ -2162,6 +2213,36 @@ function renderQuestionnaireStep() {
   }
 }
 
+// Deux listes "Mois" + "Année" de naissance ; onChange reçoit "AAAA-MM", ou null tant que les
+// deux ne sont pas choisis. (Deux listes plutôt qu'un champ "mois" : marche sur tous les navigateurs.)
+function buildBirthSelects(naissance, onChange) {
+  const [annee, mois] = naissance ? naissance.split("-").map(Number) : [null, null];
+  const row = document.createElement("div");
+  row.className = "q-hours";
+  const make = (label, placeholder, options, selected) => {
+    const wrap = document.createElement("label");
+    wrap.textContent = label;
+    const select = document.createElement("select");
+    select.appendChild(new Option(placeholder, ""));
+    options.forEach(([value, text]) => select.appendChild(new Option(text, value, false, value === selected)));
+    wrap.appendChild(select);
+    return { wrap, select };
+  };
+  const thisYear = new Date().getFullYear();
+  const years = [];
+  for (let y = thisYear; y >= thisYear - 100; y--) years.push([y, String(y)]);
+  const m = make("Mois", "Mois…", MOIS_NOMS.map((nom, i) => [i + 1, nom]), mois);
+  const y = make("Année", "Année…", years, annee);
+  const emit = () => {
+    const value = m.select.value && y.select.value ? `${y.select.value}-${String(m.select.value).padStart(2, "0")}` : null;
+    onChange(value);
+  };
+  m.select.addEventListener("change", emit);
+  y.select.addEventListener("change", emit);
+  row.append(m.wrap, y.wrap);
+  return row;
+}
+
 // Ce que le questionnaire va préparer, affiché avant de valider (et appliqué par applyProfile).
 function profileHabits(profile) {
   const chosen = OBJECTIFS.filter((o) => (profile.objectifs || []).includes(o.id));
@@ -2201,7 +2282,7 @@ function renderQuestionnaireRecap(container) {
     (qIsRedo ? " Les habitudes déjà créées ne seront pas recréées en double." : "");
   container.appendChild(note);
 
-  if (p.age === "moins15") {
+  if (isUnder15(p)) {
     const parent = document.createElement("p");
     parent.className = "q-note";
     parent.textContent = "👋 Comme tu as moins de 15 ans : quand on ajoutera les comptes en ligne, un parent devra donner son accord avec toi.";
@@ -2220,43 +2301,57 @@ function readSpaceValue(espace, fn) {
   }
 }
 
+// Redessine la vue du calendrier affichée (après un changement d'heures, de zone, de semaine A/B…).
+function refreshCalendarViews() {
+  if (!document.getElementById("appRoot").classList.contains("hidden")) applyEspaceUI();
+}
+
+// Heures affichées : les mêmes dans les 3 espaces (réglées depuis le profil uniquement).
+function applyProfileHours(debut, fin) {
+  ESPACES.forEach((e) => readSpaceValue(e.id, () => saveRange({ start: debut, end: fin })));
+}
+
+// Zone de vacances (Solo + Famille, l'Entreprise n'a pas de vacances scolaires).
+function applyProfileZone(zone) {
+  ["solo", "famille"].forEach((e) => readSpaceValue(e, () => saveZoneVacances(zone)));
+}
+
+// "A" ou "B" = lettre de la semaine en cours ; on enregistre le lundi de semaine A correspondant.
+function applyProfileSemaine(lettre) {
+  if (lettre !== "A" && lettre !== "B") return;
+  const monday = getMonday(new Date());
+  if (lettre === "B") monday.setDate(monday.getDate() - 7);
+  ["solo", "famille"].forEach((e) => readSpaceValue(e, () => saveSemaineARef(toISODate(monday))));
+}
+
+// Habitudes des objectifs, dans la liste "Mes objectifs" du Solo (jamais en double). Décocher un
+// objectif ne supprime pas ses habitudes (elles peuvent déjà avoir des jours cochés).
+function applyProfileHabits(profile, openDashboard) {
+  const { daily, monthly } = profileHabits(profile);
+  if (daily.length + monthly.length === 0) return;
+  readSpaceValue("solo", () => {
+    const previousListeId = currentTodoListeId();
+    let liste = loadTodoListes().find((l) => l.type === "habitudes" && l.nom === OBJECTIFS_LISTE_NOM);
+    if (!liste) {
+      addTodoListe(OBJECTIFS_LISTE_NOM, "habitudes");
+      liste = loadTodoListes().find((l) => l.nom === OBJECTIFS_LISTE_NOM);
+    }
+    const existing = loadHabits().filter((h) => h.listeId === liste.id).map((h) => h.nom);
+    daily.filter((nom) => !existing.includes(nom)).forEach((nom) => addHabit(liste.id, nom));
+    const existingMonthly = loadMonthlyHabits().filter((h) => h.listeId === liste.id).map((h) => h.nom);
+    monthly.filter((nom) => !existingMonthly.includes(nom)).forEach((nom) => addMonthlyHabit(liste.id, nom));
+    // Le To-do s'ouvre sur le Tableau de bord la première fois (là où les routines apparaissent).
+    saveCurrentTodoListeId(openDashboard ? TODO_SPECIAL_DASHBOARD : previousListeId);
+  });
+}
+
 function applyProfile(profile) {
   saveProfile(profile);
   if (profile.theme) applyTheme(profile.theme);
-
-  // Plage horaire (et vacances / semaines A/B sauf en Entreprise) dans chaque espace utilisé.
-  const espaces = ["solo", ...profile.pourQui.filter((e) => e !== "solo")];
-  espaces.forEach((espace) =>
-    readSpaceValue(espace, () => {
-      saveRange({ start: profile.debut, end: profile.fin });
-      if (espace === "entreprise") return;
-      if (profile.zone) saveZoneVacances(profile.zone);
-      if (profile.semainesAB === "A" || profile.semainesAB === "B") {
-        const monday = getMonday(new Date());
-        if (profile.semainesAB === "B") monday.setDate(monday.getDate() - 7);
-        saveSemaineARef(toISODate(monday));
-      }
-    })
-  );
-
-  // Habitudes des objectifs, dans la liste "Mes objectifs" du Solo (sans doublons).
-  const { daily, monthly } = profileHabits(profile);
-  if (daily.length + monthly.length > 0) {
-    readSpaceValue("solo", () => {
-      const previousListeId = currentTodoListeId();
-      let liste = loadTodoListes().find((l) => l.type === "habitudes" && l.nom === OBJECTIFS_LISTE_NOM);
-      if (!liste) {
-        addTodoListe(OBJECTIFS_LISTE_NOM, "habitudes");
-        liste = loadTodoListes().find((l) => l.nom === OBJECTIFS_LISTE_NOM);
-      }
-      const existing = loadHabits().filter((h) => h.listeId === liste.id).map((h) => h.nom);
-      daily.filter((nom) => !existing.includes(nom)).forEach((nom) => addHabit(liste.id, nom));
-      const existingMonthly = loadMonthlyHabits().filter((h) => h.listeId === liste.id).map((h) => h.nom);
-      monthly.filter((nom) => !existingMonthly.includes(nom)).forEach((nom) => addMonthlyHabit(liste.id, nom));
-      // Le To-do s'ouvre sur le Tableau de bord la première fois (là où les routines apparaissent).
-      saveCurrentTodoListeId(qIsRedo ? previousListeId : TODO_SPECIAL_DASHBOARD);
-    });
-  }
+  applyProfileHours(profile.debut, profile.fin);
+  if (profile.zone) applyProfileZone(profile.zone);
+  applyProfileSemaine(profile.semainesAB);
+  applyProfileHabits(profile, !qIsRedo);
 }
 
 function finishQuestionnaire() {
@@ -2271,6 +2366,227 @@ function finishQuestionnaire() {
     setCurrentEspace(first);
     showApp(loadUser() || {});
   }
+}
+
+// --- Menu → Mon profil : toutes les réponses, modifiables une par une (enregistrement immédiat) ---
+
+let profilSavedTimer = null;
+
+function flashProfilSaved() {
+  const el = document.getElementById("profilSaved");
+  el.classList.add("visible");
+  clearTimeout(profilSavedTimer);
+  profilSavedTimer = setTimeout(() => el.classList.remove("visible"), 1200);
+}
+
+function renderProfilPanel() {
+  const form = document.getElementById("profilForm");
+  form.innerHTML = "";
+  const user = loadUser() || {};
+  const profile = loadProfile() || { pourQui: [], objectifs: [] };
+  profile.pourQui = profile.pourQui || [];
+  profile.objectifs = profile.objectifs || [];
+  const save = () => {
+    saveProfile(profile);
+    flashProfilSaved();
+  };
+
+  const section = (titre) => {
+    const h = document.createElement("h3");
+    h.className = "profil-section";
+    h.textContent = titre;
+    form.appendChild(h);
+  };
+  // Un champ = un libellé + son contrôle (+ une petite aide optionnelle en dessous). Un <div>
+  // plutôt qu'un <label> : cliquer le titre ne doit pas cocher le premier bouton du champ.
+  const field = (label, control, aide) => {
+    const wrap = document.createElement("div");
+    wrap.className = "profil-field";
+    const title = document.createElement("span");
+    title.className = "profil-label";
+    title.textContent = label;
+    wrap.append(title, control);
+    if (aide) wrap.appendChild(aide);
+    form.appendChild(wrap);
+    return wrap;
+  };
+  const select = (options, value, onChange) => {
+    const el = document.createElement("select");
+    if (!options.some(([v]) => v === value)) el.appendChild(new Option("Non renseigné", ""));
+    options.forEach(([v, text]) => el.appendChild(new Option(text, v, false, v === value)));
+    el.addEventListener("change", () => onChange(el.value));
+    return el;
+  };
+  const aide = (text) => {
+    const p = document.createElement("span");
+    p.className = "profil-aide";
+    p.textContent = text;
+    return p;
+  };
+  // Boutons à cocher (plusieurs choix) pour "Pour qui" et "Objectifs".
+  const chips = (options, list, onToggle) => {
+    const box = document.createElement("div");
+    box.className = "profil-chips";
+    options.forEach(([v, text]) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "q-option" + (list.includes(v) ? " selected" : "");
+      btn.textContent = text;
+      btn.addEventListener("click", () => {
+        const idx = list.indexOf(v);
+        if (idx >= 0) list.splice(idx, 1);
+        else list.push(v);
+        btn.classList.toggle("selected", idx < 0);
+        onToggle(v, idx < 0);
+      });
+      box.appendChild(btn);
+    });
+    return box;
+  };
+
+  // -- Moi --
+  section("🙋 Moi");
+  const prenom = document.createElement("input");
+  prenom.type = "text";
+  prenom.value = user.prenom || "";
+  prenom.addEventListener("change", () => {
+    const value = prenom.value.trim();
+    if (!value) return;
+    saveUser({ ...(loadUser() || {}), prenom: value });
+    document.getElementById("userGreeting").textContent = `— Salut, ${value} !`;
+    flashProfilSaved();
+  });
+  field("Prénom", prenom);
+
+  const email = document.createElement("input");
+  email.type = "email";
+  email.value = user.email || "";
+  email.addEventListener("change", () => {
+    if (!email.checkValidity() || !email.value.trim()) return;
+    saveUser({ ...(loadUser() || {}), email: email.value.trim() });
+    flashProfilSaved();
+  });
+  field("Adresse mail", email);
+
+  const ageLine = aide(profile.naissance ? describeAge(profile.naissance) : "Indique ton mois et ton année de naissance.");
+  field(
+    "Naissance",
+    buildBirthSelects(profile.naissance, (naissance) => {
+      if (!naissance) return;
+      profile.naissance = naissance;
+      delete profile.age; // ancienne tranche d'âge, remplacée par la date
+      ageLine.textContent = describeAge(naissance);
+      save();
+    }),
+    ageLine
+  );
+
+  field(
+    "Situation",
+    select(SITUATION_OPTIONS, profile.situation, (value) => {
+      profile.situation = value;
+      save();
+      renderProfilPanel(); // zone / semaines A/B n'apparaissent que pour certaines situations
+      flashProfilSaved();
+    })
+  );
+
+  // -- École --
+  if (STUDENT_SITUATIONS.includes(profile.situation)) {
+    section("🏫 École");
+    if (isSchoolSituation(profile.situation)) {
+      const zone = readSpaceValue("solo", () => loadZoneVacances());
+      field(
+        "Zone de vacances",
+        select(ZONE_OPTIONS, zone, (value) => {
+          profile.zone = value;
+          applyProfileZone(value);
+          save();
+          refreshCalendarViews();
+        })
+      );
+    }
+    // On affiche la lettre réelle de la semaine en cours (elle change chaque semaine).
+    const lettre = profile.semainesAB === "non" || !profile.semainesAB ? "non" : readSpaceValue("solo", () => getWeekLetter(new Date()));
+    field(
+      "Semaines A/B",
+      select(SEMAINES_AB_OPTIONS, lettre, (value) => {
+        profile.semainesAB = value;
+        applyProfileSemaine(value);
+        save();
+        refreshCalendarViews();
+      })
+    );
+  }
+
+  // -- Planning --
+  section("📅 Planning");
+  const range = readSpaceValue("solo", () => loadRange());
+  const hours = document.createElement("div");
+  hours.className = "q-hours";
+  const startSel = document.createElement("select");
+  const endSel = document.createElement("select");
+  for (let h = 0; h <= 23; h++) startSel.appendChild(new Option(`${h}h`, h, false, h === range.start));
+  for (let h = 1; h <= 24; h++) endSel.appendChild(new Option(`${h}h`, h, false, h === range.end));
+  const onHours = (changed) => {
+    let debut = Number(startSel.value);
+    let fin = Number(endSel.value);
+    // La fin doit rester après le début : on corrige l'autre liste.
+    if (fin <= debut) {
+      if (changed === "debut") fin = Math.min(debut + 1, 24);
+      else debut = Math.max(fin - 1, 0);
+      startSel.value = debut;
+      endSel.value = fin;
+    }
+    Object.assign(profile, { debut, fin });
+    applyProfileHours(debut, fin);
+    save();
+    refreshCalendarViews();
+  };
+  startSel.addEventListener("change", () => onHours("debut"));
+  endSel.addEventListener("change", () => onHours("fin"));
+  const startLabel = document.createElement("label");
+  startLabel.textContent = "De";
+  startLabel.appendChild(startSel);
+  const endLabel = document.createElement("label");
+  endLabel.textContent = "À";
+  endLabel.appendChild(endSel);
+  hours.append(startLabel, endLabel);
+  field("Heures affichées dans le calendrier", hours, aide("Les mêmes dans les 3 espaces."));
+
+  field(
+    "Je l'utilise pour…",
+    chips(POUR_QUI_OPTIONS, profile.pourQui, () => save())
+  );
+
+  field(
+    "Mes objectifs",
+    chips(OBJECTIFS.map((o) => [o.id, o.label]), profile.objectifs, (id, added) => {
+      save();
+      // Nouvel objectif : on ajoute tout de suite ses habitudes dans « Mes objectifs ».
+      if (added) applyProfileHabits({ objectifs: [id] }, false);
+    }),
+    aide("Cocher un objectif ajoute ses habitudes dans « 🎯 Mes objectifs ». Décocher ne les supprime pas.")
+  );
+
+  const themeLabel = (THEMES.find((t) => t.id === loadTheme()) || THEMES[0]).label;
+  const themeBtn = document.createElement("button");
+  themeBtn.type = "button";
+  themeBtn.className = "btn-ghost profil-inline-btn";
+  themeBtn.textContent = `🎨 ${themeLabel} — changer`;
+  themeBtn.addEventListener("click", () => openMenuDetail("theme"));
+  field("Thème", themeBtn);
+
+  // -- Refaire tout le questionnaire (facultatif) --
+  const redo = document.createElement("button");
+  redo.type = "button";
+  redo.className = "btn-ghost profil-redo";
+  redo.textContent = "🔁 Refaire le questionnaire";
+  redo.addEventListener("click", () => {
+    closeMenuDetail();
+    openQuestionnaire(true);
+  });
+  form.appendChild(redo);
 }
 
 // --- Espaces (Solo / Entreprise / Famille) ---
@@ -2318,12 +2634,6 @@ function applyEspaceUI() {
 
   const range = loadRange();
   applyRange(range);
-  const rangeStartEl = document.getElementById("rangeStart");
-  const rangeEndEl = document.getElementById("rangeEnd");
-  if (rangeStartEl && rangeEndEl && rangeStartEl.options.length) {
-    rangeStartEl.value = range.start;
-    rangeEndEl.value = range.end;
-  }
 
   if (espace === "entreprise") entrepriseSelectedPersonneId = null;
   if (espace === "famille") familleSelectedPersonneId = null;
@@ -3637,41 +3947,6 @@ function initEvents() {
     if (e.target.id === "menuDetailOverlay") closeMenuDetail();
   });
 
-  initRangeControls();
-}
-
-function initRangeControls() {
-  const startSelect = document.getElementById("rangeStart");
-  const endSelect = document.getElementById("rangeEnd");
-
-  for (let h = 0; h <= 23; h++) {
-    startSelect.appendChild(new Option(h + "h", h));
-  }
-  for (let h = 1; h <= 24; h++) {
-    endSelect.appendChild(new Option(h + "h", h));
-  }
-
-  const range = loadRange();
-  applyRange(range);
-  startSelect.value = range.start;
-  endSelect.value = range.end;
-
-  const onChange = () => {
-    const start = Number(startSelect.value);
-    const end = Number(endSelect.value);
-    if (start >= end) {
-      // Plage invalide : on repousse l'heure de fin juste après le début.
-      endSelect.value = Math.min(start + 1, 24);
-      return onChange();
-    }
-    const newRange = { start, end };
-    saveRange(newRange);
-    applyRange(newRange);
-    renderCalendar();
-  };
-
-  startSelect.addEventListener("change", onChange);
-  endSelect.addEventListener("change", onChange);
 }
 
 function switchView(view) {

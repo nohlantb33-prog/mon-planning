@@ -78,13 +78,6 @@
         <div id="weekLabel" class="week-label">Cette semaine</div>
         <button id="nextWeek" class="btn-ghost" aria-label="Semaine suivante">→</button>
       </div>
-      <div class="range-control">
-        Afficher de
-        <select id="rangeStart"></select>
-        h à
-        <select id="rangeEnd"></select>
-        h
-      </div>
       <div id="hintWeek"></div>
 
       <div class="calendar" id="calendar"></div>
@@ -303,6 +296,11 @@
   <div id="menuDetailOverlay" class="modal-overlay hidden">
     <div class="modal">
       <h2 id="menuDetailTitle">Titre</h2>
+
+      <div id="menuTabProfil" class="menu-tab-panel hidden">
+        <div id="profilSaved" class="profil-saved">✓ Enregistré</div>
+        <div id="profilForm" class="profil-form"></div>
+      </div>
 
       <div id="menuTabTheme" class="menu-tab-panel hidden">
         <div id="themeList" class="theme-list"></div>
