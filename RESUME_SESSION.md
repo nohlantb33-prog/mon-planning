@@ -1,73 +1,65 @@
-# Résumé — Projet "Mon Planning" (mis à jour le 2026-10-05)
+# Résumé — Projet "Mon Planning"
 
 ## Contexte général
-Nohlan (lycéen) construit avec Claude Code un site de planning **100 % statique** (HTML/CSS/JS pur, pas de framework ni de serveur ; seule dépendance externe : pdf.js via CDN pour l'import PDF). Il est en train d'apprendre : expliquer simplement, étape par étape, en français. Toutes les données sont dans le `localStorage` du navigateur (rien n'est envoyé à un serveur).
+Nohlan (lycéen, TARDY-BATS Nohlan) construit un site de planning avec Claude Code, en suivant un guide pour non-développeurs ("Ton site en ligne, de A à Z"). Site 100% statique : HTML/CSS/JS pur, sans framework ni serveur (une seule dépendance externe : pdf.js via CDN, pour lire les PDF).
 
-- **Dossier :** `C:\Users\nohla\Desktop\mon-site` — fichiers : `index.html`, `style.css`, `script.js`, `manifest.json`, `sw.js`, `icons/`
-- **Dépôt GitHub :** https://github.com/nohlantb33-prog/mon-planning (branche `main`)
-- **Site en ligne (Netlify, URL non référencée, protégée par connexion) :** https://splendorous-douhua-9e49e6.netlify.app — se redéploie automatiquement à chaque push sur `main`
-- **Installable comme une app** (PWA : manifest + service worker + icônes). Testé installé sur le téléphone de Nohlan.
+**Dossier du projet :** `C:\Users\nohla\Desktop\mon-site`
+**Fichiers :** `index.html`, `style.css`, `script.js`
+**Pour tester :** ouvrir `index.html` directement dans le navigateur (double-clic, ou `start index.html` en terminal).
 
-## ⚠️ État Git : 6 commits PAS ENCORE poussés
-Les commits ci-dessous existent seulement sur le PC. Pour les mettre en ligne (et sur le téléphone), Nohlan lance **dans son propre terminal PowerShell** (l'outil de Claude n'a pas internet ni de TTY pour la connexion GitHub) :
-```
-git push
-```
-Commits en attente (du plus ancien au plus récent) :
-1. `2f11674` Texte des activités lisible sur les couleurs claires (jaune…)
-2. `22be01a` Jours de travail colorés dans la vue Semaine (Famille)
-3. `dd877dc` Jours de travail colorés aussi dans la vue Jour (Famille)
-4. `842cb23` Planning mensuel qui s'arrête à la fin de la dernière semaine du mois
-5. `9870f4b` 4 nouveaux thèmes sombres colorés (Forêt, Améthyste, Braise, Rose nuit)
-6. `5d294c6` Couleurs d'activités adaptées au thème choisi
-(+ éventuellement un 7e commit : la mise à jour de ce fichier RESUME_SESSION.md.)
+## Étapes du guide déjà faites
+- Étape 1-3 : accès Claude, application installée, prompt d'intro ✓
+- Étape 4 (setup) : Git installé ✓, VS Code installé ✓ (ouvert sur le dossier du projet)
+- **Pas encore fait** : Étape 6 (sauvegarde sur GitHub) — un `git commit` a été demandé mais bloqué : Git ne connaît pas encore le nom/email de Nohlan sur cette machine. Il faut lancer, avant de committer :
+  ```
+  git config --global user.name "Son Nom"
+  git config --global user.email "son-email"
+  ```
+- **Pas encore fait** : Étape 7 (déploiement Netlify)
 
-Identité Git configurée en local : Nohlan / nohlantb33@gmail.com. Pour voir ce qui reste à pousser : `git log origin/main..HEAD --oneline`.
+## Les 3 espaces (fonctionnalité majeure)
+Un bouton dans l'en-tête (ex: "🙋 Solo") ouvre un sélecteur pour basculer entre 3 espaces, **aux données totalement indépendantes** (localStorage à clés séparées, sauf Solo qui garde les clés d'origine pour rester rétrocompatible) :
 
-## ⚠️ Crédits Netlify (contrainte importante)
-Plan gratuit = **300 crédits/mois**, **chaque déploiement (= chaque `git push`) coûte 15 crédits**, limite stricte, remise à zéro le mois suivant. Début octobre 2026 il restait ~**90 crédits jusqu'au 22 octobre** (≈ 6 déploiements).
-→ **Règle : committer souvent en local, mais ne proposer `git push` que par gros lots** (viser 3-4 pushes max d'ici le 22 octobre). Ne pas demander de push après chaque petite modif.
+1. **Solo** : le planning personnel classique (calendrier détaillé par heure), comme avant l'ajout des espaces.
+2. **Famille** : même calendrier détaillé, mais chaque activité peut être associée à une ou plusieurs **personnes** (nom + couleur, gérées dans Menu → 👥 Personnes). Dans le formulaire d'activité, des cases à cocher permettent de sélectionner une ou plusieurs personnes :
+   - Une seule cochée → l'activité prend directement sa couleur.
+   - Plusieurs cochées → le bloc de l'activité s'affiche **divisé en plusieurs couleurs** (dégradé), sur les vues Semaine, Jour **et Mois**.
+3. **Entreprise** : interface différente, pas de calendrier horaire. Une liste de personnes (chips cliquables) + un calendrier mensuel simple : on sélectionne une personne puis on clique sur des jours pour les "peindre" à sa couleur (présence/planning simplifié). Reclic pour retirer.
 
-## Méthode de test utilisée (à refaire si besoin)
-Petit serveur HTTP PowerShell (`System.Net.HttpListener`, port 8791) lancé en tâche de fond, puis navigateur intégré de Claude sur `http://localhost:8791/index.html` ; le serveur et son script sont supprimés après chaque test. Pas de Node/Python sur la machine. Pièges : le navigateur de test refuse/ignore les `confirm()` (suppressions annulées), les captures d'écran arrivent parfois en retard (animations de fondu), et `file://` ne marche pas pour tester le service worker (il faut `http://localhost`).
+Le Menu s'adapte aussi à l'espace actif : les onglets Import/Semaines A/B/Vacances sont masqués en Entreprise (non pertinents), et l'onglet Personnes n'apparaît qu'en Entreprise/Famille.
 
-## Les 3 espaces (données totalement indépendantes, via `spaceKey()`)
-Bouton en haut (ex : "🙋 Solo") pour basculer :
-- **Solo** : calendrier détaillé Jour / Semaine / Mois.
-- **Famille** : pareil + **Personnes** (nom, couleur, case **"Cette personne travaille"**) + **Animaux** (nom, couleur) assignables aux activités (bloc multicolore si plusieurs). En vue Mois : on sélectionne une personne qui travaille puis on clique des jours pour marquer ses jours de travail (fond très léger de sa couleur) ; ces jours sont aussi teintés dans les vues **Semaine** et **Jour**.
-- **Entreprise** : Jour/Semaine/Mois ; le **Mois** est un tableau de présence par personne (sélection d'une personne, clic sur des jours = fond légèrement teinté, légende en haut) + les activités s'affichent en puces. Menu : Importer + Personnes disponibles.
+## Fonctionnalités construites dans le site
+- **3 vues** (ordre des onglets : Jour / Semaine / Mois) : Jour (une colonne, noms visibles), Semaine (calendrier compact, hauteur ajustée à l'écran), Mois (calendrier classique, n'affiche que les activités "Important"/"Très important")
+- **Formulaire d'activité** : bouton "+ Ajouter une activité" (anciennement "cours"), type par défaut = **Ponctuel**
+- **Types d'activité** : Ponctuel (date précise), Hebdomadaire (jour fixe, option Semaine A/B alternée), Quotidien — avec fin de répétition (jamais / après N fois / jusqu'à une date)
+- **Vacances scolaires** : zone A/B/C sélectionnable (Menu → Vacances), dates officielles 2026-2027, exclut automatiquement les activités récurrentes pendant les vacances
+- **Semaines A/B** : pour cours alternant une semaine sur deux (Menu → Semaines A/B définit la date de référence)
+- **Importance** : Pas important / Important (visible en Mois) / Très important (encadré rouge, couleur de fond conservée en plus depuis peu)
+- **Blocs compacts** : les activités longues (sommeil, >3h) sont affichées en hauteur réduite pour ne pas surcharger la vue Semaine
+- **Plage horaire réglable** : "Afficher de ___h à ___h" dans la vue Semaine
+- **Division en demi-heures** : clic sur une case horaire précise pour la diviser finement
+- **7 thèmes** : Clair, Pastel, Nature, Vibrant, Ardoise, Sombre, Océan (Menu → Thème)
+- **20 couleurs** disponibles pour les activités ; une activité de même nom reprend automatiquement la même couleur (y compris lors d'un import, ou entre import .ics et .pdf)
+- **Menu** (bouton "⚙️ Menu") : liste de titres uniquement (rien de présélectionné) ; cliquer sur un titre ouvre son contenu dans une fenêtre à part avec bouton "← Retour". Onglets selon l'espace : Thème, Astuces, Importer, Semaines A/B, Vacances, Personnes
+- **Astuces** : petits messages contextuels, fermables individuellement (✕), retrouvables dans Menu → Astuces
+- **Import .ics** : fiable, détecte les cours récurrents vs ponctuels automatiquement, couleurs cohérentes par nom d'activité
+- **Import .pdf** : détection basée sur les **rectangles de couleur** dessinés dans le PDF (pas seulement le texte) pour connaître la vraie durée de chaque case, avec calibrage automatique du décalage de rendu propre à chaque fichier (voir détails techniques). Repli sur une détection texte/ligne si le PDF n'a pas de rectangles exploitables. Écran de vérification avant validation (case à cocher + champs éditables : activité, jour, début, fin, salle, prof). Option "Ce PDF ne concerne qu'une seule semaine précise" pour créer des activités ponctuelles à des dates réelles plutôt que récurrentes.
+- **Bouton "Vider mon planning"** (Menu → Importer) pour repartir de zéro, avec confirmation
+- **Écran de bienvenue** (prénom + email) au premier lancement — juste pour personnaliser l'accueil, PAS un vrai système de compte (site statique, tout est stocké dans le navigateur via localStorage)
 
-## Fonctionnalités du planning
-- Vues Jour / Semaine / Mois, transitions en fondu, bouton "Aujourd'hui"/"Mois actuel", clic sur un jour (Mois ou en-tête de Semaine) → ouvre la vue Jour.
-- Formulaire d'activité : Ponctuel / Hebdomadaire / Quotidien, Semaines A/B, fin de répétition, importance (Mois n'affiche que Important / Très important sauf en Entreprise où tout s'affiche), salle/prof, 20 couleurs (même nom = même couleur).
-- Vacances scolaires 2026-2027 (zones A/B/C), plage horaire réglable, division en demi-heures.
-- Import **.ics** (fiable) et **.pdf** (détection par rectangles colorés, écran de vérification) ; "Vider mon planning".
-- **Impression** : Menu → 🖨️ Imprimer (CSS `@media print`, fond clair quel que soit le thème).
-- Planning mensuel : la grille s'arrête à la fin de la semaine qui contient le dernier jour du mois (`monthGridCellCount`).
-- **Texte lisible** : `readableTextColor()` choisit texte sombre ou blanc selon la luminance de la couleur de fond (seuil 0.25).
-- **11 thèmes** (Menu → Thème) : Clair, Pastel, Nature, Vibrant, Ardoise, Sombre, Océan + **Forêt, Améthyste, Braise, Rose nuit**. Les couleurs d'activités/habitudes/présence sont **nuancées vers l'accent du thème** (`themeAdaptColor()`, la couleur enregistrée n'est jamais modifiée) ; changer de thème redessine la vue.
-- Mobile : barre du haut réorganisée (titre au-dessus, 3 boutons en ligne + "+ Ajouter une activité" pleine largeur), cases du mois à hauteur fixe (plus de lignes qui s'étirent).
+## Sujets discutés mais non résolus / en attente
+1. **Git commit en attente** : il faut le nom/email Git de Nohlan (voir plus haut) pour finaliser le premier commit.
+2. **Cas particulier PDF non résolu** : dans l'emploi du temps de Nohlan (espace Solo), le mardi midi (10h10-11h05 et 13h00-13h55) contient des cases partagées entre deux groupes d'élèves (A/B) que le PDF mélange forcément. Il faut demander à Nohlan son groupe (A ou B) pour corriger ces deux entrées à la main — ce n'est PAS lié au système "Semaines A/B" de l'app (qui gère l'alternance d'une semaine sur l'autre, pas les groupes d'élèves simultanés).
+3. **Vrai compte / multi-appareils** : intérêt montré pour un vrai système de compte (Supabase) avec emails automatiques et accès multi-appareils, mais Nohlan a choisi de **finir l'app d'abord**. Plan discuté si repris un jour : (1) créer un compte Supabase, (2) créer un projet Supabase, (3) authentification par email, (4) migrer les données du navigateur vers la base de données, (5) envoi d'emails de rappel (ex: Resend).
+4. **Import multi-personnes / planning du mois** : question initiale de Nohlan qui a fait naître les espaces Entreprise/Famille (voir plus haut) — largement répondu par cette fonctionnalité. Si un vrai import de fichier externe (PDF/Excel) pour l'espace Entreprise est encore souhaité un jour, il faudra redemander le type de fichier exact.
 
-## Le To-do (bouton "✅ To-do", plein écran façon Notes, données par espace)
-Barre latérale : **📊 Tableau de bord**, **🎯 Tâches du jour**, puis les listes créées via "+ Nouvelle liste" (choix du type) :
-- **Tableau de bord** (par défaut) : "Aujourd'hui" (tâches du jour cochables), "Routines" (habitudes du jour, cochables, synchronisées avec les grilles), "Mes listes" (nombre de tâches restantes, clic = ouvre la liste).
-- **Tâches du jour** : liste de tâches pour **Aujourd'hui / Demain** (préparer la veille).
-- **Liste normale** : onglets "À faire" / "✅ Déjà fait" (cocher = déplacer, recliquer = annuler, ✕ = supprimer).
-- **Liste d'habitudes** (🔁) : vrai tableau jour × habitude (tous les jours du mois visibles sans défilement sur PC), % de réussite + série 🔥 par habitude, résumé global (% / Complété / Incomplet / Total), sélecteur "Cette semaine / Tout le mois" (ne change que les stats), navigation de mois, et section **📅 Habitudes mensuelles** (cochées une fois par mois, série en mois).
-Inspiré de 2 vidéos de "habit trackers" (tableur) que Nohlan avait fournies.
+## Détails techniques utiles pour la suite
+- **pdf.js** chargé via CDN (`cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/`) pour lire les PDF côté navigateur, aucun serveur nécessaire.
+- **Extraction PDF par rectangles colorés** (fonction `extractColoredRects` dans `script.js`) : parcourt `page.getOperatorList()` (opérations `constructPath` + `fill`), applique la matrice de transformation courante pour obtenir les coordonnées réelles. Bien plus fiable que la position du texte seul pour connaître la vraie durée d'un cours (le texte ne remplit pas forcément toute la case). Le décalage entre bord de rectangle et repère horaire réel est calibré automatiquement par fichier (voir `topOffset`/`bottomOffset` dans `detectGridSchedule`), en se basant uniquement sur le tout premier cours de chaque jour (le seul repère sans ambiguïté).
+- **Espaces** : `spaceKey(baseKey)` (dans `script.js`) fait pointer chaque `localStorage` vers une clé différente selon l'espace actif (`monPlanningCours_entreprise`, `monPlanningPersonnes_famille`, etc.), sauf Solo qui garde les clés historiques.
+- **Piège CSS rencontré** : une règle générique comme `.modal label { display: block }` peut avoir plus de spécificité qu'une classe seule (`.ma-classe { display: flex }`) et l'emporter silencieusement. Solution : qualifier avec le tag (`.modal label.ma-classe { ... }`). Ça a cassé l'affichage des pastilles de couleur dans les cases à cocher "Personne(s)" jusqu'à ce que ce soit corrigé.
+- Toutes les données sont dans le `localStorage` du navigateur — rien n'est envoyé à un serveur.
+- **Méthode de test utilisée pendant ces sessions** : un petit serveur HTTP local (script PowerShell avec `System.Net.HttpListener`, pas besoin de Node/Python) pour piloter le site via le navigateur Claude et déboguer précisément (notamment le parseur PDF, en comparant aux vraies coordonnées extraites). Utile à refaire si un nouveau bug coriace apparaît.
 
-## Idées non faites / possibles suites
-- Objectifs mensuels / suivi humeur-sommeil dans les habitudes (idée n°6 de la liste d'origine).
-- Afficher les habitudes mensuelles dans le Tableau de bord.
-- Le Tableau de bord/To-do ne se redessine pas tout seul au changement de thème (seulement la vue calendrier).
-- Un vrai compte multi-appareils (Supabase) a été évoqué puis mis de côté.
-- Cas PDF non résolu : cases de groupes A/B d'élèves mélangées (demander le groupe de Nohlan).
-
-## Détails techniques utiles
-- Clés `localStorage` par espace : `monPlanningCours`, `...Personnes`, `...Animaux`, `...Assignations`, `...TodoListes`, `...TodoItems`, `...TodoListeActuelle`, `...Habitudes`, `...HabitudeChecks`, `...HabitudesMensuelles(Checks)`, `...HabitudeTaches` (tâches du jour) ; Solo garde les clés d'origine sans suffixe, les autres ont `_famille` / `_entreprise`.
-- Piège CSS : une règle `display:flex` sur une classe écrase `.hidden` si elle est définie après ; solution utilisée : `.maClasse:not(.hidden)`.
-- Service worker `sw.js` : cache `mon-planning-v1` ; **si on veut forcer les téléphones à recharger les fichiers après une grosse mise à jour, incrémenter `CACHE_NAME`** (v2, v3…). Il ne s'active qu'en HTTPS ou sur localhost.
-- `renderMonthCalendar`, `renderCalendar`, `renderDayCalendar`, `renderEntrepriseMonth` partagent `applyPresenceFill()` pour la teinte de présence.
-
-## Comment reprendre
-Donner ce fichier à Claude Code au démarrage : *"Voici le résumé de nos sessions précédentes sur mon site Mon Planning, on continue à partir de là."* Penser au **git push groupé** et aux **crédits Netlify** ci-dessus.
+## Comment reprendre la prochaine fois
+Donne ce fichier à Claude Code au démarrage de la prochaine session (glisse-le dans le dossier ou colle son contenu), avec un message du type : *"Voici le résumé de nos sessions précédentes sur mon site Mon Planning, on continue à partir de là."*
