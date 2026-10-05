@@ -356,6 +356,14 @@ function formatDateShort(date) {
   return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
+// Nombre de cases (multiple de 7) d'une grille mensuelle commençant un lundi : s'arrête à la
+// fin de la semaine qui contient le dernier jour du mois, au lieu de toujours afficher 6 semaines.
+function monthGridCellCount(year, month) {
+  const offset = (new Date(year, month, 1).getDay() + 6) % 7; // 0 = lundi
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  return Math.ceil((offset + daysInMonth) / 7) * 7;
+}
+
 function isSameDay(a, b) {
   return a.toDateString() === b.toDateString();
 }
@@ -2683,7 +2691,7 @@ function renderEntrepriseMonth() {
   const firstOfMonth = new Date(year, month, 1);
   const gridStart = getMonday(firstOfMonth);
 
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < monthGridCellCount(year, month); i++) {
     const cellDate = new Date(gridStart);
     cellDate.setDate(gridStart.getDate() + i);
     const outsideMonth = cellDate.getMonth() !== month;
@@ -3185,7 +3193,7 @@ function renderMonthCalendar() {
   const firstOfMonth = new Date(year, month, 1);
   const gridStart = getMonday(firstOfMonth);
 
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < monthGridCellCount(year, month); i++) {
     const cellDate = new Date(gridStart);
     cellDate.setDate(gridStart.getDate() + i);
     const outsideMonth = cellDate.getMonth() !== month;
