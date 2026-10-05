@@ -57,7 +57,7 @@ Barre latérale : **📊 Tableau de bord**, **🎯 Tâches du jour**, puis les l
 Inspiré de 2 vidéos de "habit trackers" (tableur) que Nohlan avait fournies.
 
 ## Idées non faites / possibles suites
-- Objectifs mensuels / suivi humeur-sommeil dans les habitudes (idée n°6 de la liste d'origine).
+- Objectifs mensuels / suivi humeur-sommeil : **mis de côté** (2026-10-05). Nohlan voulait le relier à Santé (iPhone) ou à d'autres apps de suivi, impossible pour un site web (HealthKit et Health Connect sont réservés aux vraies apps natives). On y reviendra si le site devient une vraie app. Pistes notées : saisie rapide humeur + sommeil dans le site, ou pont semi-automatique via l'app Raccourcis iPhone (à tester : Safari et l'app installée ne partagent pas leur localStorage).
 - Un vrai compte multi-appareils (Supabase) a été évoqué puis mis de côté.
 - Cas PDF non résolu : cases de groupes A/B d'élèves mélangées (demander le groupe de Nohlan).
 
